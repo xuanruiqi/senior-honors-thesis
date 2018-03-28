@@ -1,0 +1,133 @@
+\documentclass[12pt]{report}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage{graphicx}
+\usepackage{natbib}
+\usepackage{color}
+\usepackage{url}
+\usepackage{epigraph}
+\usepackage{hyperref}
+\usepackage[nottoc]{tocbibind}
+
+%% \setlength\epitextskip{2ex}
+\setlength\epigraphwidth{.8\textwidth}
+\setlength\epigraphrule{0pt}
+
+\newcommand{\namesigdate}[2][5cm]{%
+  \begin{tabular}{@{}p{#1}@{}}
+    #2 \\[2\normalbaselineskip] \hrule \\[0pt]
+    {\small \textit{Signature}} \\[2\normalbaselineskip] \hrule \\[0pt]
+    {\small \textit{Date}}
+  \end{tabular}
+}
+
+\lstset{
+  frameround=fttt,
+  numbers=left,
+  breaklines=true,
+  keywordstyle=\ttfamily\color{blue}\bfseries, 
+  basicstyle=\ttfamily\color{black}\bfseries,
+  numberstyle=\ttfamily\color{black}\bfseries
+}
+
+\lstloadlanguages{Haskell}
+\lstnewenvironment{code}
+                  {\lstset{}%
+                    \csname lst@SetFirstLabel\endcsname}
+                  {\csname lst@SaveFirstLabel\endcsname}
+                  \lstset{
+                    basicstyle=\small\ttfamily,
+                    flexiblecolumns=false,
+                    basewidth={0.5em,0.45em},
+                    literate={+}{{$+$}}1 {/}{{$/$}}1 {*}{{$*$}}1 {=}{{$=$}}1
+                    {>}{{$>$}}1 {<}{{$<$}}1
+                    {\\\\}{{\char`\\\char`\\}}1
+                    {->}{{$\rightarrow$}}2 {>=}{{$\geq$}}2 {<-}{{$\leftarrow$}}2
+                    {<=}{{$\leq$}}2 {=>}{{$\Rightarrow$}}2 
+                    {\ .}{{$\circ$}}2 {\ .\ }{{$\circ$}}2
+                    {>>}{{>>}}2 {>>=}{{>>=}}2
+                    {|}{{$\mid$}}1               
+                  }
+                  
+                  \renewcommand{\lstlistingname}{Code snippet}
+    
+\begin{document}
+    
+    
+\begin{titlepage}
+\begin{center}        
+\LARGE
+\textbf{Memory Tracing for Object-Oriented and Functional Programming}
+        
+\vspace{0.5in}
+\large
+by
+\vspace{0.5in}
+
+\Large
+Xuanrui (Ray) Qi
+
+\vspace{0.25in}
+
+\normalsize
+B.S.C.S., Tufts University, 2018
+
+\vspace{1in}
+
+\normalsize
+A senior honors thesis\\~\\
+submitted to\\~\\
+the Department of Computer Science,\\
+School of Engineering,\\
+Tufts University,\\
+Medford, Massachusetts\\~\\
+\today
+
+\vspace{0.75in}
+
+\normalsize
+\textbf{Thesis Committee:}\\
+Professor Samuel Z. Guyer, Chair\\
+Professor Kathleen Fisher
+        
+\end{center}
+\end{titlepage}
+
+\section*{\centering Abstract}
+\begin{center}
+  Placeholder text.
+\end{center}
+\thispagestyle{empty}
+
+\newpage
+%% \section*{\centering Acknowledgements}
+%% \input{acknowledgements.tex}
+
+\setcounter{tocdepth}{0}
+\tableofcontents
+\thispagestyle{empty}
+
+\setcounter{page}{0}
+\chapter{Introduction}
+\input{intro.tex}
+
+\chapter{Preliminaries and Previous Work}
+\input{preliminaries.tex}
+
+\chapter{Architecture}
+\input{architecture.tex}
+
+\chapter{Implementation}
+\chapter{Extensibility: Elephant Tracks II for Functional Programmers}
+\chapter{Performance}
+\chapter{Concluding Remarks}
+\input{conclusion.tex}
+
+\chapter*{Appendix A: the Red-Black Tree Benchmark}
+\addcontentsline{toc}{chapter}{Appendix A: the Red-Black Tree Benchmark}
+\input{appendixa.tex}
+
+\bibliographystyle{acmref}
+\bibliography{thesis}
+\end{document}

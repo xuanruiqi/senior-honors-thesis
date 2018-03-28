@@ -1,0 +1,104 @@
+\section{The fundamental problem of garbage collection analysis}
+Memory management is difficult, and the horrors of manual memory management need
+not be reiterated. Reference counting is a simple alternative to manual memory
+management, but suffers from two major drawbacks: (1) it incurs significant
+runtime cost, as the reference count needs to be updated whenever a new alias is
+created or destroyed for each pointer, and (2) it results in memory leaks whenever
+cycles are formed in the reference graph. Graph-based garbage collection algorithms
+fix both problems, and are easy to parallelize and optimize \citep{GCHandbook}.
+
+Although garbage collection is a much more efficient algorithm than reference counting
+for most purposes, it has a few serious drawbacks. Garbage collection algorithms,
+no matter how refined, cause random pauses during program execution which are unpredictable
+and nondeterministic. Moreover, garbage collctors cannot tell us when objects die; all we could
+know is that garbage-collected objects die \emph{some time} between the last garbage
+collection run and the current garbage collection run.
+
+Thus, the properties of garbage collectors impede the analysis and evaluation of themselves, and
+external tools are often required to analyze garbage collectors. For example, a good garbage collector
+should minimize the time span $\Delta t$ between an object's death time $t_{d}$
+and collection time $t_{c}$. A reasonable metric that a garbage collector designer (and implementer)
+would like to minimize might be the average ``time to collection'', i.e.
+\begin{equation} \label{eq:1}
+  \overline{\Delta t} = \frac{1}{n_{obj}}\sum_{i=1}^{n_{obj}}(t_c^i - t_d^i)
+\end{equation}
+
+However, without extra analysis tools, one could not obtain even a reasonable guess for the
+$t_{d}$ value of any object, and therefore could not compute $\overline{\Delta t}$ using \ref{eq:1}.
+Obtaining death times for each object is (in principle) easy: for example, one could simply do
+``mock'' reference count on each object (without actually deallocating dead objects) and
+recording the object death times. Nevertheless, this method, albeit intuitive, suffers from
+the same drawbacks that plague the effectiveness of reference counting: this will degrade runtime
+performance (such that the validity of timestamps obtained become questionable), and this method
+could not generate death records for objects that form part of a cycle in the reference graph.
+
+For these reasons, neither Elephant Tracks II nor other GC tracing tools \citep{MemInsight, ElephantTracks}
+use reference counting to generate death record. Instead, we use the Merlin algorithm \citep{Merlin}, which
+will be discussed hereafter, to \emph{compute} precise object death records using information gathered
+at runtime.
+
+\section{The Merlin algorithm}
+Instead of (painstakingly) building a reference counter into a runtime system and generate incomplete death
+records with it, one could compute the \emph{idealized death time} of objects using the Merlin algorithm, which
+is based on a simple insight. There are two ways that object ``die'', i.e. become disconnected from the reference
+graph: when there are no more references to the object, or when all objects that hold references to the said object
+have died \citep{Merlin, ElephantTracks}. Thus, we could compute the death time of each object recursively:
+\newpage
+\begin{lstlisting}[
+    caption={Haskell-style pseudocode for the Merlin algorithm},
+    label={lst:1}, basicstyle=\small,
+    frame=single,
+    numbers=none,
+    language=haskell]
+  deathTime :: Object -> Timestamp
+  deathTime o = max (timeStamp o)
+                    (maximum pointsToDeathTimes)
+      where
+      pointsToDeathTime = map deathTime (allPointsTo o)
+\end{lstlisting}
+where  \lstinline{allPointsTo o} generates a list of objects that point to \lstinline{o}, and\\
+\lstinline{timeStamp o} fetches the ``timestamp'' for \lstinline{o}. For the purposes of the Merlin algorithm,
+the \emph{timestamp} for an object is the last time at which the object is found to be accessible or ``alive''.
+
+The na\"{i}ve recursive version of the Merlin algorithm is illustrative for purposes of understanding the
+algorithm, but is inefficient for actual implementation. However, \cite{Merlin} also gives an efficient implementation, based
+on depth-first search through the reference graph, that runs in $\Theta(n \log n)$ time and has good
+experimental results. Additionally, although the Merlin algorithm is designed to run on each garbage collection,
+it could also be run offline if garbage collections are recorded in the GC trace. In Elephant Tracks, the online
+approach is used; however, in Elephant Tracks II, the offline approach will be used.
+
+With the Merlin algorithm, the problem of generating death records is transformed into one of finding timestamps
+for each object, but the Merlin algorithm itself leaves this as an open question. For Java-like languages, the
+best marker of an object being alive is probably the object being ``used'', e.g. an instance method called on the
+object, the object being assigned to a pointer, etc. However, the strategy used is up to the implementer, and
+the effectiveness of Merlin is up to effective timestamp generation for each object.
+
+\section{Elephant Tracks}
+Elephant Tracks \citep{ElephantTracks} is the major motivation for the work in this thesis, and represents a major attempt
+to use the Merlin algorithm for practical GC tracing. Elephant Tracks is implemented as a JVM Tool Interface (JVMTI) agent, or a shared library
+containing callbacks for the JVM to call on a number of events, e.g. whenever a class is loaded.
+
+To generate timestamps for each object, Elephant Tracks rewrites the bytecode of each class before it is loaded, and inserts
+calls to methods that record significant events. For example, whenever Elephant Tracks find an object allocation in a method,
+it inserts a call to a method that records the allocation event. Whenever Elephant Tracks finds a \texttt{getfield} instruction
+in a method, it inserts a call to update the timestamp for the object subject to the instruction, as a \texttt{getfield} on an
+object indicates the aliveness of the object.
+
+When a class is about to be loaded, the JVM calls the callback function supplied to it,
+while the function sends the bytecode to a bytecode manipulator process. The ``bytecode manipulator'' rewrites the class using
+the ASM bytecode instrumentation library, and sends the instrumented bytecode back after it is done with instrumentation. Then, at
+runtime, the new, instrumented bytecode will be executed, and records will be generated by the inserted ``interceptor'' methods. As
+all production-level JVMs provide implementations of the JVMTI, Elephant Tracks is, in principle, compatible with all standards-conformant
+JVM implementations.
+
+While Elephant Tracks is mostly successful in generating precise and complete GC traces for Java programs, one may easily see that
+the implementation of Elephant Tracks is extremely inefficient. First of all, inter-process communication between the agent and the
+``bytecode manipulator'' is required on \emph{every single} class load, which adds extremely high overhead to the running Java program.
+Moreover, the ``interceptor'' methods are all native methods, requiring the JVM to invoke the JNI on any ``interesting'' event. Finally,
+this complex architecture has rendered the code base for Elephant Tracks no longer maintainable and extremely prone to bit-rot. In fact,
+by February 2018, Elephant Tracks can only run on a very old version of IBM J9 JVM, using outdated versions of the ASM library, and can
+slow down program execution by 800 to 1000 times. Initially, Elephant Tracks was proposed as a fast and portable alternative to its alternatives
+such as GCTrace, but due to architectural and design flaws, Elephant Tracks no longer meets its initial design goals.
+
+Our new tool, Elephant Tracks II, is a tool ``in the spirit of'' Elephant Tracks, but is free of many design flaws of Elephant Tracks, making
+it easily extensible and maintainable.

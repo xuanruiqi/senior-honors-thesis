@@ -1,0 +1,174 @@
+\section{The architecture of Elephant Tracks}
+\cite{ElephantTracks} listed six design goals of Elephant Tracks: precise, complete, informative,
+well-defined, portable, and fast. However, the latest release of Elephant Tracks \citep{ElephantTracksPage}
+barely achieves three of those goals, namely well-defined, portable and fast.
+
+According to \cite{ElephantTracksPage}, the current release of Elephant Tracks fails to run on most Java
+implementations (supporting only IBM J9), does not support recent Java implementations, and can be
+irritatingly slow. Most of the problems bugging Elephant Tracks could be attributed to its architecture.
+
+The old Elephant Tracks --- like the new Java frontend to Elephant Tracks --- is written as a JVM Tool Interface
+agent \citep{ElephantTracks}. The JVMTI, according to Oracle's specifications, is a interface which should be implemented
+by all standards-conforming JVMs that allow developers and debuggers to dynamically inspect and control the state
+and execution of Java programs \citep{JVMTI} running in a JVM, in a fashion similar to the GNU Debugger
+(\lstinline{gdb})'s state inspection and execution control facilities. For example, \lstinline{jdb}, the
+\lstinline{gdb}-style debugger included in both of Oracle's Java implementations (Oracle JDK and OpenJDK), is implemented
+as a JVMTI agent.
+
+The JVMTI does not specify how the JVM shall interact with JVMTI agents besides stating that they should ``run in the same
+process with and communicate directly with the virtual machine executing the application being examined''. However, since
+JVMTI agents are compiled to native shared objects on the host system, most if not all JVM implementations dynamically
+link with the JVMTI agent at runtime and call into the JVMTI agent at specific events. For example, a (rather primitive)
+profiler might want to set a callback on the entry and exit of each method to generate a call graph. At run time, every time
+a method is entered or exited, the JVM calls into the provided callback function and executes it. The JVMTI, therefore, is an
+ideal technique to implement a memory tracer. Thus, when we designed the Java frontend for ET2, we chose to continue to use
+the JVMTI as a portable and efficient technique to gather traces.
+
+Elephant Tracks uses dynamic \emph{bytecode rewriting} as its major implementation technique. A JVMTI callback is set such that
+Elephant Tracks gets access to a class's metadata and bytecode right before a class is loaded. Then, Elephant Tracks inspects
+the bytecode of each method in the class, searching for important events such as object allocation (i.e. a \lstinline{new} instruction)
+or a pointer update (usually a \lstinline{putfield} instruction). When an important event is found, the bytecode rewriter inserts a
+call to a static method in a ``proxy'' class. After Elephant Tracks rewrite the class, it is loaded and executed. During
+execution, the ``proxy'' method generates appropriate traces for the event it witnesses.
+
+For example, let us consider the following Java method, taken from a real benchmark used to profile ET2:
+\begin{lstlisting}[
+    caption={Elephant Tracks example: source code},
+    label={lst:1}, basicstyle=\small,
+    frame=single,
+    numbers=none,
+    language=java]
+  public class BinarySearchTree<T extends Comparable<T> > {
+      // other methods omitted
+    
+      public void insert(T insertVal) {
+          if (val == null) {
+              val = insertVal;
+              return;
+          }
+
+          if (val.compareTo(insertVal) <= 0) {
+              if (right == null) {
+                  right = new BinarySearchTree<T>(insertVal);
+              } else {
+                  right.insert(insertVal);
+              }
+          } else if (left == null) {
+              left = new BinarySearchTree<T>(insertVal);
+          } else {
+              left.insert(insertVal);
+          }
+      }
+  }
+\end{lstlisting}
+
+An analysis at the source code level would allow us to spot the allocation sites and pointer updates and
+``liveness witnesses'' (i.e. instructions that proves the liveness of an object) in the code:
+\begin{lstlisting}[
+    caption={Elephant Tracks example: annotated source code},
+    label={lst:1}, basicstyle=\small,
+    frame=single,
+    numbers=none,
+    language=java]
+
+  public class BinarySearchTree<T extends Comparable<T> > {
+      // other methods omitted
+      
+      public void insert(T insertVal) {
+          // witness the liveness of the callee of ``insert''
+        
+          if (val == null) {
+              // pointer update: val -> insertVal
+              val = insertVal;
+              return;
+          }
+
+          if (val.compareTo(insertVal) <= 0) {
+            if (right == null) {
+                  // allocation and pointer update
+                  right = new BinarySearchTree<T>(insertVal);
+              } else {
+                  right.insert(insertVal);
+              }
+          } else if (left == null) {
+              // allocation and pointer update
+              left = new BinarySearchTree<T>(insertVal);
+          } else {
+              left.insert(insertVal);
+          }
+      }
+  }
+\end{lstlisting}
+
+
+Next, we examine the bytecode of the \lstinline{compile} method. The \lstinline{BinarySearchTree} class
+is compiled using \lstinline{javac} version 1.8.0\_161 and then disassembled using \lstinline{javap}. We have
+added comments that marks the places where Elephant Tracks would inject method calls.
+\begin{lstlisting}[
+    caption={Elephant Tracks example: annotated bytecode},
+    label={lst:1}, basicstyle=\small,
+    frame=single,
+    numbers=none,
+    language=jvmis]
+  public void insert(T);
+      Code:
+         0: aload_0
+         1: getfield      #2  // Field val:Ljava/lang/Comparable;
+         4: ifnonnull     13
+         7: aload_0
+         8: aload_1
+         // pointer update
+         9: putfield      #2  // Field val:Ljava/lang/Comparable;
+        // method exit
+        12: return
+        13: aload_0
+        14: getfield      #2  // Field val:Ljava/lang/Comparable;
+        17: aload_1
+        // liveness witness (``val'') & method call
+        18: invokeinterface #6,  2  // InterfaceMethod java/lang/Comparable.compareTo:(Ljava/lang/Object;)I
+        23: ifgt          59
+        26: aload_0
+        27: getfield      #4  // Field right:LBinarySearchTree;
+        30: ifnonnull     48
+        33: aload_0
+        // allocation
+        34: new           #7  // class BinarySearchTree
+        37: dup
+        38: aload_1
+        // method call
+        39: invokespecial #8  // Method "<init>":(Ljava/lang/Comparable;)V
+        42: putfield      #4  // Field right:LBinarySearchTree;
+        45: goto          89
+        48: aload_0
+        49: getfield      #4  // Field right:LBinarySearchTree;
+        52: aload_1
+        // liveness witness (``right'') & method call
+        53: invokevirtual #9  // Method insert:(Ljava/lang/Comparable;)V
+        56: goto          89
+        59: aload_0
+        60: getfield      #3  // Field left:LBinarySearchTree;
+        63: ifnonnull     81
+        66: aload_0
+        // allocation
+        67: new           #7  // class BinarySearchTree
+        70: dup
+        71: aload_1
+        // method call
+        72: invokespecial #8  // Method "<init>":(Ljava/lang/Comparable;)V
+        // pointer update
+        75: putfield      #3  // Field left:LBinarySearchTree;
+        78: goto          89
+        81: aload_0
+        82: getfield      #3  // Field left:LBinarySearchTree;
+        85: aload_1
+        // liveness witness (``left'') & method call
+        86: invokevirtual #9  // Method insert:(Ljava/lang/Comparable;)V
+        // method exit
+        89: return
+\end{lstlisting}
+
+As one might see, there are two deciding factors that constrain Elephant Tracks' efficiency: the efficiency
+of bytecode rewriting, and the number (and efficiency) of inserted method calls. However, these two aspects are exactly
+the places where Elephant Tracks perform badly.
+
+Elephant Tracks 
