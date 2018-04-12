@@ -59,7 +59,7 @@ two Java programs that create memory leaks:
 \end{lstlisting}
 
 In C or C++, memory leaks are, despite being much more numerous, relatively easier to deal with as they are easier to spot and could
-be found using tools like \emph{valgrind}. In most cases, a programmer only needs to find a \lstinline{malloc} call that is not paired
+be found using tools like \lstinline{valgrind}. In most cases, a programmer only needs to find a \lstinline{malloc} call that is not paired
 with a \lstinline{free} call. However, in Java, memory leaks are infrequent, but they are hidden and might have serious consequences if
 not discovered. A Java programmer might know when and where their object is allocated, but they almost never know when their object dies.
 Moreover, the garbage collection overhead adds an indeterminable cost to program execution; although there are effective methods to decrease
@@ -97,8 +97,8 @@ latency, i.e., time lapsed between the death of an object and its eventual deall
 Despite the importance of memory tracing in the analysis of garbage collection and memory usage in managed languages, there have
 been few tools available to perform this task. One preexisting tool, GCTrace, is available as a component of the Jikes RVM \citep{JikesRVM}. However,
 the Jikes RVM has been of research interest only, and has been mostly superseded by HotSpot JVM even in that field. Moreover, GCTrace
-is built into the Jikes RVM and updates to the JVM itself has rendered it unusable in newer versions of Jikes RVM. Thus, GCTrace has
-mostly been fell into disuse. Another tool, Elephant Tracks \citep{ElephantTracks}, comes from our previous work, and was designed with
+is built into the Jikes RVM and updates to the JVM itself has rendered it unusable in newer versions of Jikes RVM. Thus, GCTrace had
+mostly fell into disuse. Another tool, Elephant Tracks \citep{ElephantTracks}, comes from our previous work, and was designed with
 the goal to be portable between different JVMs in mind; in practice, Elephant Tracks has proved to be a relatively trustworthy tool.
 
 However, Elephant Tracks has three fatal flaws. First, Elephant Tracks is not well documented and standardized, so its trace output
@@ -138,6 +138,11 @@ goals of Elephant Tracks II are as following:
   now analyze GC traces from any language in principle.
 \end{enumerate}
 
+\section{Collaboration}
+Elephant Tracks II is a large project and is certainly not the work of one person. I did most of the design and implementation of the
+Java bytecode rewriter. Many the tracing algorithms were devised in collaboration with Samuel Guyer, and the Merlin algorithm backend was
+written by Leandro Watanabe during his internship at Google. A large team of researchers from Google and the Australian National University
+collaborated on the Elephant Tracks II project in general, although much of the work is not in the scope of this thesis.
 
 \section{Outline of the thesis}
 The thesis will be divided into six chapters, excluding this introductory chapter. Chapter 2 will introduce the premliminaries and
@@ -145,6 +150,5 @@ past work, including the Merlin algorithm \citep{Merlin}, memory tracing techniq
 especially issues concerning the design of the original Elephant Tracks. Chapter 3 will outline the architecture, trace format and
 major design concerns in the design of Elephant Tracks 2. Chapter 4 will discuss the implementation of Elephant Tracks II, including
 the major programming techniques and strategies used to deal with difficult situations. Chapter 5 will discuss the extensibility of
-Elephant Tracks II and explore the possibility of using Elephant Tracks II to analyze the memory behavior of non-object oriented,
-and especially functional languages. Chapter 6 will present experimental results using a series of benchmarks, including the DaCapo
+Elephant Tracks II. Chapter 6 will present experimental results using a series of benchmarks, including the DaCapo
 benchmarks \citep{DaCapo}. Chapter 7 will provide a comparison to other work, outline future work, and conclude the thesis.

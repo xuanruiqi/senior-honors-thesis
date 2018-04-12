@@ -101,9 +101,9 @@ An analysis at the source code level would allow us to spot the allocation sites
 \end{lstlisting}
 
 
-Next, we examine the bytecode of the \lstinline{compile} method. The \lstinline{BinarySearchTree} class
-is compiled using \lstinline{javac} version 1.8.0\_161 and then disassembled using \lstinline{javap}. We have
-added comments that marks the places where Elephant Tracks would inject method calls.
+Next, the bytecode of the \lstinline{compile} method shall be examined. The \lstinline{BinarySearchTree} class
+is compiled using \lstinline{javac} version 1.8.0\_161 and then disassembled using \lstinline{javap}. Comments which mark the places where
+Elephant Tracks would inject method calls have been inserted.
 \begin{lstlisting}[
     caption={Elephant Tracks example: annotated bytecode},
     label={lst:1}, basicstyle=\small,
@@ -161,14 +161,78 @@ added comments that marks the places where Elephant Tracks would inject method c
         81: aload_0
         82: getfield      #3  // Field left:LBinarySearchTree;
         85: aload_1
-        // liveness witness (``left'') & method call
+        // liveness witness ("left") & method call
         86: invokevirtual #9  // Method insert:(Ljava/lang/Comparable;)V
         // method exit
         89: return
 \end{lstlisting}
 
 As one might see, there are two deciding factors that constrain Elephant Tracks' efficiency: the efficiency
-of bytecode rewriting, and the number (and efficiency) of inserted method calls. However, these two aspects are exactly
-the places where Elephant Tracks perform badly.
+of bytecode rewriting, and the number (and efficiency) of inserted method calls. However, these two aspects
+are exactly the places where Elephant Tracks perform badly.
 
-Elephant Tracks 
+In the Elephant Tracks workflow, a JVMTI callback fetches the bytecode of a newly loaded class, and then launches
+a rewriting procedure (using the ASM library) in a new JVM process. The communication between the Elephant Tracks
+host JVM and the newly lanched Java process is facilitated using standard UNIX interprocess communication utilities.
+Then, the rewriter inserts a number of instrumentation method calls to the program. However, the instrumentation calls
+are JNI invocations, and this results in the abstraction barrier between the JVM and the underlying system being broken
+frequently, resulting in many important JVM facilities (such as just-in-time compilation) becoming unusable. The overheads of
+interprocess communication and JNI invocations, when combined, results in poor performance for Elephant Tracks.
+
+For details on the design of Elephant Tracks, however, we shall direct readers to \cite{ElephantTracks}. The main point here is
+that the design of Elephant Tracks is driven by implementation and unmodular, and thus it contains a few important flaws which
+need to be rectified. Thus, to optimize the workflow of Elephant Tracks, we propose a new design that decouples separate tasks
+involved in memory tracing.
+
+\section{Overview}
+Elephant Tracks II contains two major components: the trace-collecting frontend, and the death-time computing backend. The two
+components are completely decoupled from each other; as long as the frontend generates complete program traces in a 
+Elephant Tracks II-compatible format, the backend will be able to compute accurate death records for the program trace, while the
+accuracy of death records is completely up to the accuracy of the frontend. In other words, the backend is completely agnostic
+about the frontend: the language of the program being traced and the method used to do tracing is irrelevant when it comes to
+death time computation.
+
+Elephant Tracks II is primarily designed for Java and other languages running on the Java virtual machine. For the sake of simplicity,
+we will refer to \emph{both} the backend and the JVM frontend as ``Elephant Tracks II'' without qualification. However, Elephant Tracks II is not limited
+to Java and the JVM: a frontend could be implemented for any programming language that use heap allocation, pointers, and garbage collection
+\emph{at the implementation level}. Haskell, for example, does not have pointers or a memory model at the language level as all data is
+immutable; however, heap allocation and pointers are used by the Glasgow Haskell Compiler to implement functional closures and lazy evaluation.
+Thus, it is possible to use Elephant Tracks with the \emph{GHC implementation} of Haskell \footnote{However, if there was ever a
+  implementation of Haskell which does not use pointers and heap-allocated memory in its memory model, such as an implementation
+  directly on a SECD machine, we will not be able trace Haskell programs in that implementation. Fortunately, all practical Haskell
+  compilers targeting the von Neumann architecture need to use heap allocation and pointers.}. Although we did not implement a Haskell
+frontend for ET2 in the work leading to this thesis, we will describe a model for adapting ET2 to functional programming systems in
+\hyperref[chap:extensible]{chapter 5}.
+
+The algorithms and strategies used by the backend to compute death times will be described in the \hyperref[chap:algoimp]{next chapter}. In
+the rest of this chapter, we will mainly discuss the high-level design of ET2.
+
+\section{The ET2 frontend: trace collector}
+Memory tracing is inherently slow, and the trace collector is where most of the problem is at. However, to safely optimize trace collection, we must
+first decouple the trace collection phase from the computation phase. In the Elephant Tracks II architecture, the implementation of the
+frontend, or trace collector, is not defined. Instead, the implementer may select whichever implementation technique that is appropriate. For Java,
+we have continued to use bytecode rewriting as our main technique. However, for a native code compiler-based languages implementation like the GHC,
+building trace-generation into the runtime might be a more appropriate technique.
+
+To calculate object death times, five types of traces are required: procedure entry, procedure exit, object allocation, pointer updates, and \emph{witness}. Each trace must have a \emph{timestamp} which is necessary for running Merlin. A timestamp in the context of
+ET2 is a logical timestamp that impose a total ordering on events; examples of good candidates for timestamps are the total number of 
+method entries and exits, or the total number of allocated bytes. A physical timestamp, however, is not recommended as the trace
+collector slows down program execution substantially. However, in the presence of concurrency, a total ordering on events might not be
+appropriate. In that case, we could potentially use techniques such as Lamport clocks \citep{LamportClock} to induce a partial ordering
+on events; however, this is still an open research problem\footnote{We will revisit this problem in the
+\hyperref[chap:conclusion]{final chapter}.}.
+
+The procedure entry trace has the following format:
+
+\begin{verbatim}
+M <procedure-id> <receiver-object-id> <thread-id> <timestamp>
+\end{verbatim}
+
+In case that the traced programming language is not object-oriented, or that the method is global (e.g. a static method in Java), the
+\lstinline{receiver-object-id} should be 0. 
+
+The procedure exit trace has a similar format, only with the \lstinline{M} replaced by an \lstinline{E}. A procedure might be
+exited due to either returning from the procedure or a thrown exception (such as \lstinline{throw} in Java or \lstinline{raise} in ML)
+\footnote{Besides exceptions, other control operators, such as \lstinline{shift} in Racket and
+  \lstinline{yield} in Lua, can also result in a procedure being exited without returning from the procedure. These should also be
+  counted as method exits.}, and ET2 does not discern between these different types of exits.

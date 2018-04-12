@@ -44,7 +44,7 @@ type system, a value can be used no more than once \citep{SubstructuralTypes}. I
 inference, a substructural type system effectively allows for compile-time inference of object lifetimes.
 
 Little has been done in using substructural type systems to determine object lifetimes for real, sensible programs.
-However, the Rust programming language \citep{RustLang} has introduced aspects of substructural types into a systems
+However, the Rust programming language \citep{RustLang} has introduced a substructural type system into a systems
 programming language, and has been successful in automatically determining lifetimes of values and objects using
 type information. However, reference counting is still required in order to achieve reference sharing; moreover, there are
 certain cases where the lifetimes of function parameters could not be determined automatically and where manual

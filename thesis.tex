@@ -2,13 +2,17 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{listings}
+\PassOptionsToPackage{hyphens}{url}
+\usepackage[breaklinks=true]{hyperref}
 \usepackage{graphicx}
 \usepackage{natbib}
 \usepackage{color}
-\usepackage{url}
 \usepackage{epigraph}
-\usepackage{hyperref}
 \usepackage[nottoc]{tocbibind}
+
+\hypersetup{colorlinks,citecolor=magenta,linkcolor=blue,urlcolor=blue}
+
+\interfootnotelinepenalty=10000
 
 %% \setlength\epitextskip{2ex}
 \setlength\epigraphwidth{.8\textwidth}
@@ -58,7 +62,7 @@
 \begin{titlepage}
 \begin{center}        
 \LARGE
-\textbf{Memory Tracing for Object-Oriented and Functional Programming}
+\textbf{Elephant Tracks II: Practical, Extensible Memory Tracing}
         
 \vspace{0.5in}
 \large
@@ -94,6 +98,7 @@ Professor Kathleen Fisher
 \end{center}
 \end{titlepage}
 
+\newpage
 \section*{\centering Abstract}
 \begin{center}
   Placeholder text.
@@ -116,16 +121,23 @@ Professor Kathleen Fisher
 \input{preliminaries.tex}
 
 \chapter{Architecture}
+\label{chap:arch}
 \input{architecture.tex}
 
-\chapter{Implementation}
-\chapter{Extensibility: Elephant Tracks II for Functional Programmers}
+\chapter{Algorithms and Implementation}
+\label{chap:algoimp}
+
+\chapter{Extensibility}
+\label{chap:extensible}
+
 \chapter{Performance}
+
 \chapter{Concluding Remarks}
+\label{chap:conclusion}
 \input{conclusion.tex}
 
-\chapter*{Appendix A: the Red-Black Tree Benchmark}
-\addcontentsline{toc}{chapter}{Appendix A: the Red-Black Tree Benchmark}
+\chapter*{Appendix A: Overview of Code Repositories}
+\addcontentsline{toc}{chapter}{Appendix A: Overview of Code Repositories}
 \input{appendixa.tex}
 
 \bibliographystyle{acmref}
