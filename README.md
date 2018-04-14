@@ -2,7 +2,7 @@
 
 ## Instructions
 
-Building my thesis: `./compile` on the shell. Requires `latexmk`.
+Building my thesis: `./compile` on the shell. Requires `latexmk`.  
 Required LaTeX packages: `graphicx`, `natbib`, `tocbibind`, `listings`, `epigraph`, `hyperref`
 
 ## Software related to this thesis
