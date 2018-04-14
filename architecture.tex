@@ -229,10 +229,23 @@ M <procedure-id> <receiver-object-id> <thread-id> <timestamp>
 \end{verbatim}
 
 In case that the traced programming language is not object-oriented, or that the method is global (e.g. a static method in Java), the
-\lstinline{receiver-object-id} should be 0. 
+\lstinline{receiver-object-id} should be 0. For a language without threading support, the thread ID could be 0.
 
 The procedure exit trace has a similar format, only with the \lstinline{M} replaced by an \lstinline{E}. A procedure might be
-exited due to either returning from the procedure or a thrown exception (such as \lstinline{throw} in Java or \lstinline{raise} in ML)
-\footnote{Besides exceptions, other control operators, such as \lstinline{shift} in Racket and
+exited due to either returning from the procedure or a thrown exception (as implemented by \lstinline{throw} in Java and
+\lstinline{raise} in ML)
+\footnote{Besides exceptions, other control operators, such as \lstinline{throw} in Standard ML, \lstinline{shift} in Racket and
   \lstinline{yield} in Lua, can also result in a procedure being exited without returning from the procedure. These should also be
   counted as method exits.}, and ET2 does not discern between these different types of exits.
+
+The heap allocation trace has the following format:
+
+\begin{verbatim}
+<alloc-type> <object-id> <size> <type> <site> <length> <thread-id> <timestamp>
+\end{verbatim}
+
+There are two types of allocations: an allocation is either ``singular'' (as in allocating a Java object) or ``block'' (as in
+allocating a Java array). An array allocation (denoted by \lstinline{A}) is deemed to have occured when a logically contiguous
+section of memory is allocated for a sequential collection of objects (i.e. an array), and in all other cases an allocation is
+singular (denoted by \lstinline{N}). The \lstinline{object-id} is an unique, numerical identifier which identifies a newly allocated
+heap object, while \lstinline{site} is a globally unique, numerical identifier for each site at which allocation occurs. 
