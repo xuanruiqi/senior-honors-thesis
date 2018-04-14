@@ -1,1 +1,2 @@
+#!/bin/bash
 latexmk -pdf thesis.tex; latexmk -c thesis.tex
