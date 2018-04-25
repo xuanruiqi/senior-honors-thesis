@@ -1,0 +1,74 @@
+One of the merits of Elephant Tracks II is that it is highly configurable and extensible. Unlike Elephant Tracks, which is
+``baked into'' the Java model of program execution, Elephant Tracks II is --- more or less --- language agnostic. Specifically,
+although ET2 assumes a certain runtime model of programs, the model is more or less accurate of most programming languages. Extending
+ET2 to other object-oriented programming languages like JavaScript should be straightforward, although doing so might require significant
+engineering effort. In this chapter, however, we will briefly describe extending ET2 to non-object oriented programming languages, primarily
+functional programming languages
+
+\section{Tracing von Neumann representations of functional programming languages}
+Functional programming languages liberate programming from the von Neumann style \citep{LiberateProgramming}. However, most if not all of modern
+computers are based on the von Neumann architecture. Thus, to represent functional programs in a von Neumann style, one needs to use special
+data representations to represent elements of functional programming.
+
+\subsection{Functional closures}
+In implementations of functional programming languages, a \emph{closure} is a data structure representing functions combined with a mutable ``store'',
+or evaluation environment. For example, consider the following Haskell function \lstinline{makeAdder}\footnote{Note that this function definition is,
+  in fact, redundant. It is equivalent to simply partially applying the function \lstinline{(+)}.}:
+
+\begin{lstlisting}[
+    caption={\lstinline{makeAdder}},
+    label={lst:1}, basicstyle=\small,
+    frame=single,
+    numbers=none,
+    language=haskell]
+  makeAdder :: Integer -> (Integer -> Integer)
+  makeAdder n = add
+    where
+      add m = m + n
+\end{lstlisting}
+
+Internally, the function \lstinline{makeAdder} is represented as a functional closure containing code and an environment containing \lstinline{n} and
+\lstinline{add}, while \lstinline{add} is represented as another functional closure containing \lstinline{m} in its environment. An closure, thus, is essentially
+an heap-allocated structure containing a number of out pointers, and is amenable to memory tracing.
+
+\vspace*{5mm}
+\begin{center}
+\begin{tikzpicture}[
+  mynode/.style = {rectangle, draw, align=center, 
+            inner xsep=6mm, inner ysep=3mm}]
+  \node [mynode, label={[name=lab1]\lstinline{mkAdder}}] (inner1) {\lstinline{add}};
+  \node [mynode, below = 2mm of inner1] (inner2) {\lstinline{n}};
+  \node [fit={(inner1) (inner2) (lab1)}, draw] (outer) {};
+
+  \node [mynode, label={[name=lab2]\lstinline{add}}, right = 3.15cm of outer] (inner3) {\lstinline{m}};
+  \node [fit={(inner3) (lab2)}, draw, right = 3cm of outer] (outer2) {};
+
+  \path [draw, ->] (inner1) to (outer2);
+
+\end{tikzpicture}
+
+\end{center}
+
+In principle, in a pure functional programming language, none of the pointers in closure structures should be updated. However, as a matter of efficiency,
+many functional programming language runtimes use mutation to support certain types of evaluation. Memory tracing, if implemented, could help us understand
+``internal mutability'' as a programming language implementation technique.
+
+\subsection{Lazy evaluation and thunks}
+Lazy evaluation \citep{LazyEval} is an evaluation strategy and language design technique frequently employed in functional programming languages to support
+features such as infinite lists and streams, most notably in the Haskell programming language, which uses lazy evaluation as the default evaluation strategy
+\citep{Haskell}.
+
+In Haskell and other lazy programming languages, lazy evaluation is implemented using \emph{thunks}, which are heap-allocated code wrappers\footnote{One could
+  also think of thunks as closures without captured environment.}. For each delayed (i.e. non-eager) computation, a thunk is allocated for it. For example, 
+\lstinline{cons} (or, in Haskell, \lstinline{(:)}) might wrap each argument in a thunk, forcing the evaluation of either only when requested. This allows
+infinite lists to be represented in finite memory.
+
+However, thunk leaks are a major memory problem in Haskell. In Haskell, virtually all calls are lazy, and thus almost every function call wraps its arguments
+inside thunks. When a function has a very deep call tree, the number of thunks allocated increases rapidly. Through memory tracing thunks, language implementers
+could better understand the ``hot'' locations of trace allocation and deallocation with greater accuracy.
+
+\section{Making sense of functional memory traces}
+Although we can add tracing to many functional programming languages by modifying and extending their runtime systems, it is not a trivial task to make sense out
+of the traces. Linked data structures and closures usually map to language constructs (i.e., algebraic data types and lexically-scoped functions) quite closely,
+but other kinds of heap-allocated structures (such as thunks) might not map to language-level constructs straightforwardly. To make sense of memory traces of
+functional programming languages, new labeling mechanisms will need to be devised.

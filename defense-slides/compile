@@ -1,0 +1,4 @@
+#!/bin/bash
+
+latexmk -pdf slide.tex
+latexmk -c slide.tex

@@ -56,14 +56,26 @@ have died \citep{Merlin, ElephantTracks}. Thus, we could compute the death time 
       where
       pointsToDeathTime = map deathTime (allPointsTo o)
 \end{lstlisting}
-where  \lstinline{allPointsTo o} generates a list of objects that point to \lstinline{o}, and\\
+where \lstinline{allPointsTo o} generates a list of objects that point to \lstinline{o}, and\\
 \lstinline{timeStamp o} fetches the ``timestamp'' for \lstinline{o}. For the purposes of the Merlin algorithm,
 the \emph{timestamp} for an object is the last time at which the object is found to be accessible or ``alive''.
 
 The na\"{i}ve recursive version of the Merlin algorithm is illustrative for purposes of understanding the
-algorithm, but is inefficient for actual implementation. However, \cite{Merlin} also gives an efficient implementation, based
+algorithm, but is inefficient for actual implementation, and in fact, will not terminate when the reference graph
+contains cycles. However, \cite{Merlin} also gives an efficient, stack-based, implementation, based
 on depth-first search through the reference graph, that runs in $\Theta(n \log n)$ time and has good
-experimental results. Additionally, although the Merlin algorithm is designed to run on each garbage collection,
+experimental results.
+
+Another way of thinking about the Merlin algorithm is that the idealized death time for each object, in a cyclic
+graph, is that the idealized death time of each object is the least fixed-point that satisfies the equation
+
+\begin{equation*}
+  T_d(o) = \mathrm{max}(T_s(o), \{T_d(p) \mid \forall p : p \rightarrow o\})
+\end{equation*}
+
+and the DFS-based implementation is simply an instance of the iterative method for the least fixed-point.
+
+Additionally, although the Merlin algorithm is designed to run on each garbage collection,
 it could also be run offline if garbage collections are recorded in the GC trace. In Elephant Tracks, the online
 approach is used; however, in Elephant Tracks II, the offline approach will be used.
 

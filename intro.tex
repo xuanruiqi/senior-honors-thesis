@@ -70,7 +70,7 @@ memory allocations and deallocations. In this case, it is extremely hard for pro
 for programmers to analyze the cost of their program operations. Although functional programming languages are not designed to be
 memory efficient, sometimes the cost of programs is simply too large to be ignored. For example, due to lazy evaluation and
 the use of function closures, a simple red-black tree benchmark in Haskell allocates more than 3 gigabytes of memory on the heap
-(see Appendix A for the program). In comparison, both the Standard ML and OCaml versions of this benchmark, compiled using their
+(see the \hyperlink[appendix:a]{Appendix} for the program). In comparison, both the Standard ML and OCaml versions of this benchmark, compiled using their
 respective optimizing native-code compilers (MLton and \lstinline{ocamlopt}), allocate only about 1.6 gigabytes of memory, ostensibly due to
 both SML and OCaml using eager evaluation. Most of the extra memory Haskell allocates is deallocated immediately, but at this scale,
 the space cost of functional programs does deserve more comprehension.  
@@ -85,7 +85,6 @@ To better understand memory usage patterns in programs and identify
 potential memory bottlenecks, we could use dynamic analysis to generate memory traces, or records of lives and
 deaths of objects dynamically allocated on the heap. With those records, one could fully understand the memory usage
 patterns of automatically memory managed programs.
-
 Memory and garbage collection tracing is of paramount importance to the analysis of memory performance in garbage-collected
 languages. Experimental studies of memory behavior and garbage collector performance \citep{ScalaJava, Garbology} rely on
 precise analysis made possible by GC tracers. Moreover, memory tracing can be useful for debugging memory bugs and potential leaks
@@ -119,7 +118,7 @@ of Elephant Tracks. As a result, the only choice left is to mostly scrape Elepha
 using the same trace-gathering mechanics as Elephant Tracks, Elephant Tracks II is architecturally very different from the original Elephant
 Tracks.
 
-In this thesis, we will present \emph{Elephant Tracks II} (ET2), a GC tracing tool and memory analysis framework that inherits many of
+In this thesis, we will present \emph{Elephant Tracks II} (ET2), a practical, extensible GC tracing tool and memory analysis framework that inherits many of
 the goals of Elephant Tracks, but which is also substantially different from Elephant Tracks in many ways; ET2 could thus be considered
 a successor to Elephant Tracks. 
 
@@ -139,16 +138,17 @@ goals of Elephant Tracks II are as following:
 \end{enumerate}
 
 \section{Collaboration}
-Elephant Tracks II is a large project and is certainly not the work of one person. I did most of the design and implementation of the
-Java bytecode rewriter. Many the tracing algorithms were devised in collaboration with Samuel Guyer, and the Merlin algorithm backend was
-written by Leandro Watanabe during his internship at Google. A large team of researchers from Google and the Australian National University
-collaborated on the Elephant Tracks II project in general, although much of the work is not in the scope of this thesis.
+Elephant Tracks II is a large project and is certainly not the work of one person. I did most of the design and the implementation of the
+Java bytecode rewriter, but many the tracing algorithms were devised in collaboration with Samuel Guyer, while the backend was
+written by Leandro Watanabe during his internship at Google based on code previously written by Samuel Guyer and Nathan Ricci. A team
+of researchers from Google and the Australian National University collaborated on the Elephant Tracks II project in general, although much of the
+work is not in the scope of this thesis.
 
 \section{Outline of the thesis}
-The thesis will be divided into six chapters, excluding this introductory chapter. Chapter 2 will introduce the premliminaries and
+The thesis will be divided into six chapters, excluding this introductory chapter. \hyperref[chap:prelim]{Chapter 2} will introduce the premliminaries and
 past work, including the Merlin algorithm \citep{Merlin}, memory tracing techniques, and issues with earlier GC tracer designs,
-especially issues concerning the design of the original Elephant Tracks. Chapter 3 will outline the architecture, trace format and
-major design concerns in the design of Elephant Tracks 2. Chapter 4 will discuss the implementation of Elephant Tracks II, including
-the major programming techniques and strategies used to deal with difficult situations. Chapter 5 will discuss the extensibility of
-Elephant Tracks II. Chapter 6 will present experimental results using a series of benchmarks, including the DaCapo
-benchmarks \citep{DaCapo}. Chapter 7 will provide a comparison to other work, outline future work, and conclude the thesis.
+especially issues concerning the design of the original Elephant Tracks. \hyperref[chap:arch]{Chapter 3} will outline the architecture, trace format and
+major design concerns in the design of Elephant Tracks 2. \hyperref[chap:algoimp]{Chapter 4} will discuss the implementation of Elephant Tracks II, including
+the major programming techniques and strategies used to deal with difficult situations. \hyperref[chap:extensible]{Chapter 5} will discuss the extensibility of
+Elephant Tracks II, especially to functional programming languages. \hyperref[chap:conclusion]{Chapter 6} will provide a comparison to other work and outline
+future work. \hyperref[chap:realconclusion]{Chapter 7} will conclude the thesis.

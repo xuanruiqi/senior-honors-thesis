@@ -2,13 +2,19 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{listings}
+\usepackage{textcomp}
 \PassOptionsToPackage{hyphens}{url}
-\usepackage[breaklinks=true]{hyperref}
+\usepackage[breaklinks=true, naturalnames=true]{hyperref}
 \usepackage{graphicx}
 \usepackage{natbib}
 \usepackage{color}
 \usepackage{epigraph}
 \usepackage[nottoc]{tocbibind}
+\usepackage{amsthm}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{shapes.multipart, positioning, fit}
 
 \hypersetup{colorlinks,citecolor=magenta,linkcolor=blue,urlcolor=blue}
 
@@ -34,6 +40,9 @@
   basicstyle=\ttfamily\color{black}\bfseries,
   numberstyle=\ttfamily\color{black}\bfseries
 }
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
 
 \lstloadlanguages{Haskell}
 \lstnewenvironment{code}
@@ -82,11 +91,11 @@ B.S.C.S., Tufts University, 2018
 \normalsize
 A senior honors thesis\\~\\
 submitted to\\~\\
-the Department of Computer Science,\\
-School of Engineering,\\
-Tufts University,\\
+the Department of Computer Science\\
+School of Engineering\\
+Tufts University\\
 Medford, Massachusetts\\~\\
-\today
+May 3, 2018
 
 \vspace{0.75in}
 
@@ -99,18 +108,29 @@ Professor Kathleen Fisher
 \end{titlepage}
 
 \newpage
-\section*{\centering Abstract}
-\begin{center}
-  Placeholder text.
-\end{center}
+\vspace*{\fill}
+\noindent
+ELEPHANT TRACKS II: PRACTICAL, EXTENSIBLE MEMORY TRACING\\~\\\\~\\
+Copyright by Xuanrui (Ray) Qi, 2018\\~\\\\~\\
+This thesis is licensed under the Creative Commons Attribution 4.0 International (CC BY 4.0) License.\\
+For a copy of the license, please visit: ~\url{https://creativecommons.org/licenses/by/4.0/legalcode}.\\~\\\\~\\
+This thesis is typeset using \LaTeX.
+\vspace*{\fill}
 \thispagestyle{empty}
 
 \newpage
-%% \section*{\centering Acknowledgements}
-%% \input{acknowledgements.tex}
+\section*{\centering Abstract}
+\input{abstract.tex}
+\thispagestyle{empty}
+
+\newpage
+\section*{\centering Acknowledgements}
+\input{acknowledgements.tex}
 
 \setcounter{tocdepth}{0}
-\tableofcontents
+{\hypersetup{linkcolor=black}
+ \tableofcontents
+}
 \thispagestyle{empty}
 
 \setcounter{page}{0}
@@ -118,6 +138,7 @@ Professor Kathleen Fisher
 \input{intro.tex}
 
 \chapter{Preliminaries and Previous Work}
+\label{chap:prelim}
 \input{preliminaries.tex}
 
 \chapter{Architecture}
@@ -126,18 +147,23 @@ Professor Kathleen Fisher
 
 \chapter{Algorithms and Implementation}
 \label{chap:algoimp}
+\input{implementation.tex}
 
 \chapter{Extensibility}
 \label{chap:extensible}
+\input{extensible.tex}
 
-\chapter{Performance}
-
-\chapter{Concluding Remarks}
+\chapter{Related and Future Work}
 \label{chap:conclusion}
+\input{futurework.tex}
+
+\chapter{Conclusion}
+\label{chap:realconclusion}
 \input{conclusion.tex}
 
-\chapter*{Appendix A: Overview of Code Repositories}
-\addcontentsline{toc}{chapter}{Appendix A: Overview of Code Repositories}
+\chapter*{Appendix: Overview of Code Repositories}
+\addcontentsline{toc}{chapter}{Appendix: Overview of Code Repositories}
+\label{appendix:a}
 \input{appendixa.tex}
 
 \bibliographystyle{acmref}

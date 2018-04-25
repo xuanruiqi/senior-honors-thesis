@@ -1,0 +1,241 @@
+A good design is neccessary for, but does not guarantee, good software. In the case of Elephant Tracks II, the more streamlined
+and modular design guides our implmentation and makes implementation much less painful and more debuggable, but the implementation
+is still a difficult task, for which we developed a few new techniques and algorithms to make the implementation easier. In this
+chapter, we will describe the implementation both of the Java frontend and of the backend, as well as the new techniques and
+algorithms used to support the implementation.
+
+\section{Implementing the Java frontend}
+The Java frontend of ET2 is, like Elephant Tracks, still implemented as a JVMTI agent \citep{JVMTI}, and use \emph{bytecode rewriting}
+as the main implementation technique.
+
+\subsection{Bytecode rewriting: how and why?}
+Although other implementation techniques are possible, we believe that bytecode rewriting is still the best implementation technique by
+far. In bytecode rewriting, our JVMTI agent inserts a hook at the time of class loads, and at each class load gets the bytecode of the
+class programmatically and rewrites it to insert instrumentation calls. To analyze and manipulate Java bytecode, we use the JNIF native
+instrumentation library \citep{JNIF}, which has the benefit that it is written in C++ and can be linked statically with our JVMTI agent,
+making instrumentation cheap and efficient.
+
+Since Java does not support global procedures, all instrumentation calls are static methods and placed into a separate class
+(called \lstinline{ETProxy}) that is loaded when ET2 is started. Then, a \lstinline{invokestatic} bytecode instruction is inserted at each
+event to call the instrumentation method. For example, for a method entry event, a call to the method \lstinline{onEntry} would be inserted.
+
+ET2 assigns each class, method and object a unique numerical identifier, and passes it to the instrumentation call in order to be used in the
+output. In the trace, all classes, procedures and objects are identified with integers in order to decrease the size of the trace.
+
+However, why bytecode rewriting? From a virtual machine perspective, it is expensive to break abstraction barriers and call outside of the
+segregated virtual execution environment, due to the overhead needed to enforce the separation of environments. Moreover, modern JVMs have
+tracing just-in-time compilers (JITs) that compile frequently executed code. Thus, it is naturally economical to write all instrumentation
+calls natively, in Java, and bytecode rewriting becomes the natural choice to insert those instrumentation calls into the program. 
+
+\subsection{Event detection}
+The event detection mechanism in ET2 is rather simple. In our event model, each event corresponds to one or mode Java bytecode instructions.
+Thus, to instrument an event, ET2 simply searches for the target bytecode instructions in the bytecode for each method (using JNIF), and
+inserts a call to the instrumentation method either before the instrumented bytecode instruction. Most of the time, ET2 can simply
+manipulate the stack and duplicate all arguments to the instruction, placing the necessary arguments at the top of the stack.
+
+However, there are a few tricky cases which have to be dealt with slightly differently:
+\begin{itemize}
+\item \textbf{object allocation}: since an newly allocated object is, counter-intuitively, not a Java object, we cannot pass it directly into
+  an instrumentation call. Instead, we ``delay'' the call until the object is fully initialized. Specifically, we generate a new local variable
+  slot, put a reference to the newly allocated object into that slot, and search for the next call to \lstinline{invokespecial} (which should be
+  the call to the new object's constructor). We insert the instrumentation call after the call to the \lstinline{invokespecial}, when the object
+  is fully initialized;
+\item \textbf{constructors and static methods}: we do not record the ``receiving object'' for such methods, because they either do not exist
+  (in the case of static methods) or are not objects (in the case of constructors);
+\item \textbf{allocation of multi-dimensional arrays}: we treat the array as an array of objects and then recursively generate traces for each
+  sub-array;
+\item \textbf{exception throws}: we do not treat them specially (as in Elephant Tracks) but instead as normal method exits.
+\end{itemize}
+
+There are currently still a few cases which we do not handle correctly. Specifically, we skip trace generation for all native method calls, and we
+do not handle reflective object creation correctly as of yet. However, \cite{ElephantTracks} describes a simple technique to capture native method
+calls (by wrapping all native calls in a non-native method call), which should be easily implementable. Handling reflective object creation is more
+tricky, but is also possible, and, as such, mainly an engineering challenge \citep{ElephantTracks}. \lstinline{invokedynamic} calls could not be
+instrumented, as JNIF does not support the instrumentation of \lstinline{invokedynamic} instructions; it is an open question as to how such calls
+should be handled.
+
+\subsection{Witnessing object liveness}
+Object liveness is always a difficult problem in a complex enough language like Java, even though we could technically get complete and accurate
+liveness records using dynamic analysis. Specifically, it is hard to define what is a ``witness'' for an object being alive. In Elephant Tracks II, we
+select a few simple metrics for assessing object liveness:
+\begin{enumerate}
+\item an object must be alive if it is assigned to a variable (i.e. accessed directly);
+\item an object must be alive if one of its fields is accessed;
+\item an object must be alive if one of its instance methods is called;
+\item an object is alive if it is used as an argument to a method call. However, it is not clear as to for how long is the object alive. In ET2, we assume
+  that using an object as an argument to a method call only guarantees liveness of the object at method entry.
+\end{enumerate}
+
+When any of these events are detected, ET2 inserts a call to an instrumentation method, which in turn produces a timestampped \lstinline{W} trace for the object.
+
+\subsection{A simple technique: bounded buffers}
+Since I/O operations are costly, it might be a good idea not to output traces in every instrumentation call. Thus, ET2 uses a bounded buffer to store all
+events and output all traces at once when the buffer is full. Whenever we refer to ``generating'' a trace, we mean storing the event into the buffer for
+subsequent output.
+
+\subsection{Timestamping events}
+\label{subsec:timestamp}
+The Merlin algorithm is driven by timestamps \citep{Merlin}, so it is necessary to generate timestamps for each event, especially for \lstinline{W} traces.
+In ET2, we use a \emph{logical} timestamp, i.e. an integer that increases through the program's execution trace, to timestamp events. Our timestamps form a
+\emph{total order} so that there is a strict ordering on the sequence of events.
+
+Formally, we can define a timestamp function as a function $TS : E \to \mathbb{N}$ over the set of events $E$:
+\theoremstyle{definition}
+\begin{definition}[Elephant Tracks II timestamps]
+  Let $E$ be the set of Elephant Tracks II events that occur during a certain execution of a program $P$. Let $\sqsubset$ be the total order
+  over $E$ defined by chronological order during the given execution of $P$, i.e. if in a certain execution event $e_1$ happens before $e_2$, then
+  we say $e_1 \sqsubset e_2$.
+  
+  Then, a \emph{timestamp function} is a total function $TS : E \to \mathbb{N}$ that is nondecreasing with respect to $\sqsubset$, i.e., if
+  $e_1 \sqsubset e_2$, then $TS(e_1) \leq TS(e_2)$. For an event $e$, $TS(e)$ is called its \emph{timestamp}.
+\end{definition}
+
+A simple timestamp for events would be the total number of bytes allocated at the time of the event. Total bytes allocated is easy to calculate and
+intuitively nondecreasing, as the total number of bytes allocated could not decrease. However, allocation is not a frequent event among
+all events, and thus there would be many different events with equal timestamps. Therefore, the total number of bytes allocated, as a timestamp, has
+rather poor granularity. Another simple timestamping strategy would be to use a ``method clock'', in which each method entry or exit would increase
+the clock by 1. This would have better granularity, as method entries and exits are much more common; however, this could still result in many events
+having the same timestamp.
+
+For Elephant Tracks II, we propose a new timestamping strategy: using the total number of executed bytecode instructions as a timestamp. Since JNIF allows
+accessing the bytecode offset of each bytecode instruction \citep{JNIF}, this should be easily calculable by ET2. Because multiple events rarely happen at
+the same bytecode instruction, this should result in very good granularity.
+
+\subsection{Processing names}
+In traces, all types (in a Java context, classes), procedures (i.e. methods) and objects are represented by numerical identifiers. Elephant Tracks II use a
+simple mechanism to generate identifiers for each class and method: for each new class or method, the current ID count is incremented and assigned to the
+class or method. Then, the name of the class or method is entered into a table for future queries. For objects (which are unnamed whatsoever), the built-in
+Java method \lstinline{System.identityHashCode} is used. Two separate \lstinline{names} files, which record the name-ID mapping, are generated for methods
+and classes, one for each.
+
+\subsection{Putting it together}
+In short, the ET2 Java fronend workflow is as following:
+\begin{enumerate}
+\item activate instrumentation when the JVM is fully initialized;
+\item before each class is loaded (i.e. on JVMTI \lstinline{ClassFileLoadHook} events), intercept the class and pass the bytecode to the bytecode rewriter;
+\item check each method in the class and search for interesting events, then insert a call to an instrumenting method after the event;
+\item when the method is running, the instrumentation calls are executed and produce event records;
+\item periodically, those records are outputted in the form of traces.
+\end{enumerate}
+
+The workflow is greatly simplified compared to the workflow of Elephant Tracks \citep{ElephantTracks}, and no extra processes need to be forked. All
+instrumentation now occur inside the JVM process (either in the running Java code or as part of the loaded JVMTI agent). Moreover, there is no need to keep
+track of heap graphs or timestamps because computation is now separated from tracing. Technically, ET2 should run on all standard-conformant Java virtual
+machines, but some JVMs (such as OpenJDK 8 HotSpot) have reported bugs due to unclear reasons. However, the most commonly used commercial-grade JVM, Oracle
+JDK 8 HotSpot, is fully supported.
+
+\section{Adapting the Merlin algorithm}
+Elephant Tracks has full access to garbage collection information and can remove objects from the reference graph model accurately, i.e. at each garbage
+collection. However, ET2 does not run inside the language runtime, and instead calculates object death timestamps by simulating garbage collection.
+
+As stack information is unavailable at analysis time, an accurate garbage collection on the heap graph model could not be performed, but it is possible
+to perform a ``conservative'' simulation by making reasonable assumptions about garbage collection roots. Here, we describe a few different adaptations
+of the Merlin algorithm that are based on a mark-sweep garbage collection model:
+
+\subsection{The case without garbage collection}
+The simplest algorithm would be not to use garbage collection, constructing a heap graph of all objects that have all been alive, and then calculate timestamps
+for all objects all at once at the end of the simulation:
+
+\begin{algorithm}[H]
+  \caption{Merlin without GC}
+  \SetKwProg{Fn}{Function}{}{end}
+  \SetKwFunction{Init}{Initialization}
+  \SetKwFunction{Merlin}{CalculateDeathTime}%
+  \Fn{\Init{}}{
+    \For{each object}{
+      $TS(thisObj) \leftarrow \infty$\;
+    }
+  }
+  \Fn{\Merlin{heapGraph}}{
+    $workList \leftarrow$ empty list\; 
+    sort $workList$\ ascending\;
+    \While{$workList$ is not empty}{
+      $currObj \leftarrow$ pop $WorkList$\;
+      \For{each object pointed to by $currObj$}{
+        $TS(pointedObj)$ = max$(TS(currObj), TS(pointedObj))$\;
+        \If{$TS(currObj) > TS(pointedObj)$}{
+          push $WorkList$ $pointedObj$\;
+        }
+      }
+    }
+  }
+\end{algorithm}
+
+Essentially, this algorithm performs a depth-first search on a directed cyclic graph (with cycle detection) and propagates the smaller timestamp.
+
+This algorithm is, relatively, the easiest to implement. However, using no GC would drastically increase the memory footprint of the simulator and result in
+a rather slow computation and the end of the simulation. Recall that the time complexity of depth-first search is $O(V + E)$, where $V$ is the number of
+objects and $E$ is the number of pointers. Supposing that the implementation uses 20 bytes to represent each heap object, a program with 1,000,000 objects
+and 10,000,000 pointers will create a memory footprint of around 20 megabytes (which does not yet seem a lot) and perform a very length computation. When
+$V$ and $E$ increase, both time and space complexity of the algorithm would drastically increase. Thus, omitting GC would perhaps be a poor idea in practice.
+
+\subsection{Conservative root detection}
+Alternatively, we may use \emph{conservative root detection} as our GC simulation algorithm. Conservative root detection requires the tracer to mark all
+parameters to procedure calls using \lstinline{P} records, and assume that all pointers, once passed to a procedure as an argument, are alive throughout
+the lexical scope of the procedure. To manage these evaluation contexts, we use a stack to simulate the call stack and push all calls onto the stack. In
+short, our algorithm proceeds as following:
+
+\begin{enumerate}
+\item whenever a procedure is called, set a mark on the stack;
+\item push all parameters to the procedure on the stack;
+\item inside the method, whenever a witness (\lstinline{W}) record is found, push the living pointer on the stack;
+\item when the GC is invoked, start from all pointers on the stack and perform a depth-first search. Mark all objects reached;
+\item run Merlin on the heap graph;
+\item when a procedure is exited, pop the stack until we reach the mark, and remove the current mark.
+\end{enumerate}
+
+Note that this algorithm could not underestimate roots and could only overestimate roots. Any object that has been alive inside a procedure will be treated
+as alive throughout the procedure, even if the pointer pointing to this object is now pointing to another object. Thus, this algorithm could never collect an
+object that is not already dead by accident, and is safe to run.
+
+The pseudocode representation of the algorithm is as following:
+
+\begin{algorithm}[H]
+  \caption{GC with conservative root detection}
+  \SetKwProg{Fn}{Function}{}{end}
+  \SetKwFunction{Roots}{TraceRoots}
+  \SetKwFunction{GC}{SimulateGC}
+  \SetKwFunction{Merlin}{CalculateDeathTime}%
+  $refStack \leftarrow$ empty stack\; 
+  \Fn{\Roots{trace}}{
+    \For{each trace}{
+      \If{trace is procedure entry}{
+        set a mark on $refStack$\;
+      }
+      \If{trace is parameter or witness}{
+        push $refStack$ $object$\;
+      }
+      \If{trace is procedure exit}{
+        pop everyting above the latest mark\;
+        delete mark\;
+      }
+    }
+  }
+  \Fn{\GC{heapGraph}}{
+    \For{each object in $rootStack$}{
+      $traverseStack \leftarrow$ empty stack\;
+      mark $currObj$;
+      \If{$currObj$ is not already marked}{
+        push $traverseStack$ $currObj$\;
+      }
+      \While{$traverseStack$ is not empty}{
+        $currObj \leftarrow$ pop $traverseStack$\;
+        \For{each object pointed to by $currObj$}{
+          \If{object is not already marked}{
+            mark object\;
+            push $traverseStack$ $object$\;
+          }
+        }
+      }
+    }
+    run Merlin\;
+    remove all unmarked objects from $heapGraph$\;
+  }
+\end{algorithm}
+
+
+\section{Implementing the backend}
+Implementing the backend is relatively straightforward, although not completed by far. Mainly, we were able to reuse much of the old Elephant Tracks
+simulator (which is written in the C++ programming language) and add GC simulation/death time computation procedures to it. Specifically, we implement
+algorithm modularity, in which each GC simulation/death time computation algorithm is implemented as one implementation of a module (i.e. class), so that
+adding new GC simulation algorithms is easy and straightforward.

@@ -1,0 +1,85 @@
+\documentclass[11pt]{beamer}
+\usetheme{Warsaw}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+
+\author{Xuanrui (Ray) Qi}
+\title{Elephant Tracks II: Practical, Extensible Memory Tracing}
+% \setbeamercovered{transparent} 
+% \setbeamertemplate{navigation symbols}{} 
+% \titlegraphic{\includegraphics[height=1.5cm]{tuftscs}} 
+\institute{Department of Computer Science,\\Tufts University} 
+\date{Senior Honors Thesis Defense\\May 3, 2018\\~\\
+  \small
+  Commitee: Samuel Z. Guyer, Kathleen Fisher}
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+%\begin{frame}
+%\tableofcontents
+%\end{frame}
+
+\begin{frame}
+  \frametitle{Goals of my thesis}
+  \textbf{Make memory tracing great again!}
+  \begin{enumerate}
+  \item Make memory tracing fast(er)
+  \item Make memory tracing extensible and eventually available for
+    languages other than Java
+  \item Develop new, language-agnostic techniques to run the Merlin algorithm
+  \item Make it easier for programmers to interact with memory traces
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}
+  \frametitle{What is memory tracing?}
+  \begin{itemize}
+  \item \textbf{Complete} chronological record of what happened in the heap
+  \item Allocations, pointers updates/overwrites, etc.
+  \item Usually also contains some call-stack information
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{How to get memory traces?}
+  \begin{itemize}
+  \item Through dynamic analysis/instrumentation
+    \pause
+  \item Generating records on each allocation, pointer update, procedure entry/exit, etc.
+    \pause
+  \item What about deaths? They aren't obvious through dynamic analysis!
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Thanks to my collaborators}
+  \includegraphics[scale=0.1]{google.jpg}
+  \hspace*{\fill}
+  \includegraphics[scale=0.1]{anu.jpeg}
+  \textbf{Google}: JC Beyler, Man Cao, Wessam Hassanein, Kathryn McKinley, Ryan Rose,
+  Leandro Watanabe
+  
+  \textbf{ANU}: Steve Blackburn
+
+  (all in alphabetical order)
+\end{frame}
+
+\begin{frame}
+  \frametitle{And finally...}
+  Thanks to my committee:
+  \begin{itemize}
+  \item Professor Sam Guyer (chair)
+  \item Professor Kathleen Fisher
+  \end{itemize}
+
+  and thanks to everyone who came today!
+\end{frame}
+
+\end{document}

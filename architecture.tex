@@ -184,7 +184,7 @@ that the design of Elephant Tracks is driven by implementation and unmodular, an
 need to be rectified. Thus, to optimize the workflow of Elephant Tracks, we propose a new design that decouples separate tasks
 involved in memory tracing.
 
-\section{Overview}
+\section{Overview of ET2 architecture}
 Elephant Tracks II contains two major components: the trace-collecting frontend, and the death-time computing backend. The two
 components are completely decoupled from each other; as long as the frontend generates complete program traces in a 
 Elephant Tracks II-compatible format, the backend will be able to compute accurate death records for the program trace, while the
@@ -207,7 +207,7 @@ frontend for ET2 in the work leading to this thesis, we will describe a model fo
 The algorithms and strategies used by the backend to compute death times will be described in the \hyperref[chap:algoimp]{next chapter}. In
 the rest of this chapter, we will mainly discuss the high-level design of ET2.
 
-\section{The ET2 frontend: trace collector}
+\section{The frontend: trace collector}
 Memory tracing is inherently slow, and the trace collector is where most of the problem is at. However, to safely optimize trace collection, we must
 first decouple the trace collection phase from the computation phase. In the Elephant Tracks II architecture, the implementation of the
 frontend, or trace collector, is not defined. Instead, the implementer may select whichever implementation technique that is appropriate. For Java,
@@ -222,30 +222,113 @@ appropriate. In that case, we could potentially use techniques such as Lamport c
 on events; however, this is still an open research problem\footnote{We will revisit this problem in the
 \hyperref[chap:conclusion]{final chapter}.}.
 
+\subsection{Types of traces}
 The procedure entry trace has the following format:
 
-\begin{verbatim}
-M <procedure-id> <receiver-object-id> <thread-id> <timestamp>
-\end{verbatim}
+\begin{lstlisting}[
+    frame=none,
+    numbers=none]
+  M <procedure-id> <receiver-object-id> <thread-id> <timestamp>
+\end{lstlisting}
 
 In case that the traced programming language is not object-oriented, or that the method is global (e.g. a static method in Java), the
 \lstinline{receiver-object-id} should be 0. For a language without threading support, the thread ID could be 0.
 
+A series of \lstinline{P} traces mark parameters to the called procedure, with one trace accompanying one parameter. The \lstinline{P}
+record has the following format:
+
+\begin{lstlisting}[
+    frame=none,
+    numbers=none]
+  P <procedure-id> <param-object-id> <thread-id> <timestamp>
+\end{lstlisting}
+
 The procedure exit trace has a similar format, only with the \lstinline{M} replaced by an \lstinline{E}. A procedure might be
 exited due to either returning from the procedure or a thrown exception (as implemented by \lstinline{throw} in Java and
-\lstinline{raise} in ML)
-\footnote{Besides exceptions, other control operators, such as \lstinline{throw} in Standard ML, \lstinline{shift} in Racket and
-  \lstinline{yield} in Lua, can also result in a procedure being exited without returning from the procedure. These should also be
-  counted as method exits.}, and ET2 does not discern between these different types of exits.
+\lstinline{raise} in ML), and ET2 does not discern between these different types of exits\footnote{Besides exceptions, other
+  control operators, such as \lstinline{throw} in Standard ML of New Jersey, \lstinline{shift} in Racket and
+  \lstinline{coroutine.yield} in Lua, can also result in a procedure being exited without properly returning from the procedure. These should
+  also be treated as procedure exits.}.
 
 The heap allocation trace has the following format:
 
-\begin{verbatim}
-<alloc-type> <object-id> <size> <type> <site> <length> <thread-id> <timestamp>
-\end{verbatim}
+\begin{lstlisting}[
+    frame=none,
+    numbers=none]
+  <alloc-type> <object-id> <size> <type> <site> <length> <thread-id> <timestamp>
+\end{lstlisting}
 
 There are two types of allocations: an allocation is either ``singular'' (as in allocating a Java object) or ``block'' (as in
 allocating a Java array). An array allocation (denoted by \lstinline{A}) is deemed to have occured when a logically contiguous
-section of memory is allocated for a sequential collection of objects (i.e. an array), and in all other cases an allocation is
+section of memory is allocated for a sequential, homogenous collection of objects (i.e. an array), and in all other cases an allocation is
 singular (denoted by \lstinline{N}). The \lstinline{object-id} is an unique, numerical identifier which identifies a newly allocated
-heap object, while \lstinline{site} is a globally unique, numerical identifier for each site at which allocation occurs. 
+heap object, while \lstinline{site} is a globally unique, numerical identifier for each site at which allocation occurs. The
+\lstinline{length} field is only needed for block allocations and represent the number of objects allocated in the allocation; for
+singular allocations, this field shall be 0.
+
+The pointer update trace, which is the most complex record of all, has the following format:
+
+\begin{lstlisting}[
+    frame=none,
+    numbers=none]
+  U <old-target-id> <object-id> <new-target-id> <field-id> <thread-id> <timestamp>
+\end{lstlisting}
+
+The \emph{pointer update} trace assumes the runtime memory model uses records of pointers (i.e. similar to Java classes or C structs), but
+workarounds could be designed for similar memory models. A \lstinline{U} record denotes that a field (with ID \lstinline{field-id}) in an
+object (with ID \lstinline{object-id}), which previously pointed to \lstinline{old-target-id}, now points to \lstinline{new-target-id}, where
+both \lstinline{old-target-id} and \lstinline{new-target-id} are IDs for memory objects.
+
+The most important, but least intuitive trace type, the \emph{witness} trace, has the following format:
+
+\begin{lstlisting}[
+    frame=none,
+    numbers=none]
+  W <object-id> <thread-id> <timestamp>
+\end{lstlisting}
+
+The \lstinline{W} trace tells us one and only one thing: a thread observed that an object is alive at a given time. What counts as being \emph{alive}
+is implementation-defined, but it must only underestimate, and not overestimate liveness: otherwise, the trace computation will identify live objects
+as being dead! For example, for our Java implementation, we used a rather conservative methodology: an object is alive whenever it is used explicitly in a
+program, for example, when a field is accessed, when an instance method is invoked on the object, or when an reference the object is supplied as an
+argument to a method. Note, for example, we only make conservative estimations: we only assume an object is alive up to the time it was used as a method
+argument, and do not assume that the object stays alive throught the method (which, however, might be true unbeknownst to us).
+
+Finally, there is a garbage collection trace that is generated on each invocation of the garbage collector, which simply tells us that the GC has been
+invoked by a certain thread at a certain point in time:
+
+\begin{lstlisting}[
+    frame=none,
+    numbers=none]
+  G <thread-id> <timestamp>
+\end{lstlisting}
+
+However, the \lstinline{G} trace is optional, as the simulator could decide for itself when to start simulating a GC.
+
+\subsection{Tracing a program}
+In Elephant Tracks II, a program is traced as it is executed, and the program tracing frontend outputs the traces as the corresponding events occur. This
+allows a program trace to fully and accurately capture the execution profile of a program during a certain run of the program. Again, the ET2 framework does
+not define how the tracer should be implemented, thus we would leave discussion of our tracer for the \hyperref[chap:algoimp]{next chapter}. 
+
+\section{The backend: GC simulator}
+Different ET2 frontends designed for different runtime systems may have completely different implementations, but all of them share the same backend. The
+backend could be thought of as a simple ``interpreter'' for the traces: essentially, it reads in a trace line by line, simulates the heap graph according
+to the trace, simulates a garbage collection when prompted, and computes the death times of objects that have died since the last GC invocation.
+
+The backend has three different phases that run alternately: the simulation phase and the computation phase.
+
+\subsection{The simulation phase}
+In the simulation phase, the simulator ``regenerates'' the program heap according to the \lstinline{N}, \lstinline{A}, and \lstinline{U} traces, and keeps
+track the current execution environment by keeping a stack of procedure records according to the \lstinline{M} and \lstinline{E} traces. The regenerated
+heap should have the same shape as the program's heap at runtime, if tracing is done correctly.
+
+\subsection{The computation phase}
+Whenever we reach a \lstinline{G} record in our trace (or, in the absence of such records, when a set of conditions trigger collection), the simulator enters
+the computation phase. In the collection phase, the simulator simply deletes from the reconstructed heap graph all unreachable nodes following a simple
+mark-sweep procedure.
+
+However, since we do not have access to information about the program in the simulator besides what is available in the traces, the garbage collection roots
+could not be known precisely. In the \hyperref[chap:algoimp]{next chapter} we will describe a few methods to approximate this collection phase.
+
+As objects get garbage-collected, their death time would be computed using the Merlin algorithm. That is, the simulator tries to decide the ``precise'' death
+time using a graph search. Again, we will leave the specifics to the \hyperref[chap:algoimp]{next chapter}.

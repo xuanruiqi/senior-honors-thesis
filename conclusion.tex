@@ -1,153 +1,17 @@
-\section{Related work on object lifetime analysis}
-We call Elephant Tracks II a ``memory analysis framework'' because Elephant Tracks II traces could be used
-for many different purposes, but at its core, Elephant Tracks II is a lifetime analysis tool. However, there
-are many different approaches---which will be briefly discussed here---to lifetime analysis besides the approach that
-Elephant Tracks II uses.
-
-\subsection{Static lifetime analysis techniques: regions and region inference}
-Elephant Tracks II uses dynamic analysis to determine object lifetimes. As such,
-it incurs a heavy runtime penalty such that precise analysis could be conducted, and
-that accurate traces could be generated.
-
-Thus, the huge overhead of Elephant Tracks II and other dynamic memory tracing
-tools could be prohibitive in real world circumstances. For example, one single
-execution of long-running applications like servers and daemons might last days, months
-or even years, and it is almost impossible for a programmer to use Elephant Tracks II
-to analyze these applications. Naturally, as with any kind of program analysis task, one
-might ask if there are \emph{static} instead of \emph{dynamic} approaches to the same task.
-In this case, one may be willing to give up some accuracy for efficiency, as analyses could
-now be completed at compile time as opposed to at runtime.
-
-The technique for static inference of object lifetimes has long existed. One such algorithm,
-\emph{region inference} \citep{RegionInference, StackOfRegions}, is based on the concept of memory ``regions'', which are simply
-blocks of heap-allocated memory. In this memory model, heap memory management is based on pushing
-and popping a stack of regions: an object is deallocated when its containing region is popped from the
-``stack''. In other words, object deallocation times and thus object lifetimes are decided statically. Both
-the now-defunct ML Kit Standard ML compiler and the heavily optimizing MLton \citep{MLton} compiler
-perform region analysis to complement standard garbage collection. With some tweaking, one can turn a
-region inferencer into an (approximate) ``static memory tracer''.
-
-Although \cite{RegionInference}'s algorithm does support imperative features like reads and writes into references,
-the inference rules are still relatively simplistic for more complicated imperative languages. The Cyclone
-project attempts to use region inference to determine object lifetime statically in the context of
-low-level, imperative programming languages, and has achieved good practical results \citep{Cyclone}. However,
-although in many cases the Cyclone compiler could perform region inference automatically, sometimes explicit
-region annotations by the programmer are required, making Cyclone incomplete as an object lifetime inference
-system.
-
-\subsection{Type-theoretic approach: linear and substructural type systems}
-For programming languages theorists and mathematically-inclined programmers, there is an even more straightforward
-approach to static object lifetime analysis: that is, to (implicitly) encode lifetime information in objects'
-types. One category of such type systems is the \emph{substructural} type systems, which add usage constraints to
-its objects: for example, in a \emph{linear} type system, all values must be used exactly once; in an \emph{affine}
-type system, a value can be used no more than once \citep{SubstructuralTypes}. If combined with some type
-inference, a substructural type system effectively allows for compile-time inference of object lifetimes.
-
-Little has been done in using substructural type systems to determine object lifetimes for real, sensible programs.
-However, the Rust programming language \citep{RustLang} has introduced a substructural type system into a systems
-programming language, and has been successful in automatically determining lifetimes of values and objects using
-type information. However, reference counting is still required in order to achieve reference sharing; moreover, there are
-certain cases where the lifetimes of function parameters could not be determined automatically and where manual
-annotations are required. Finally, there is no rigorous proof of the correctness of Rust's lifetime analysis, and bugs in the
-reference implementation have most certainly been found, but more recently \cite{RustBelt} has proved the correctness and consistency
-of a large subset of Rust, which includes many of Rust's lifetime inference rules.
-
-\subsection{Caveats of static analysis methods}
-However, one must note that none of the aforementioned static methods could generate perfectly accurate death records for objects,
-as a simple corollary of Rice's theorem. For many practical purposes, statically generated ``death records'' are sufficient, but
-dynamic analysis is still irreplaceable when preciseness is important (such as when evaluating the performance of garbage collectors).
-
-Moreover, it is extremely difficult to devise static analyses for industry-strength programming languages. It is relatively simple
-to devise a region inference algorithm for a well-defined and relatively simple language like Standard ML, but for more complex and
-less well-defined functional programming languages such as Haskell, OCaml and Scala --- not to mention imperative programming
-languages like Java --- such algorithms will be much harder or even practically impossible to devise. Elephant Tracks II was designed
-and developed by a college senior under the advisement of one professor, but even a simple region inference algorithm for a
-small subset of Java would be much harder to devise. If one takes into account the human cost of research and development, dynamic
-analysis is still, by far, the most effective method to generate memory traces.
-
-\section{The next step: using ET2 for (more) productive purposes}
-The main body of this thesis describes the architecture and implementation of Elephant Tracks II, but relatively little is devoted to
-explaining why Elepahnt Tracks II is useful. Indeed, as stated in the introduction, memory traces generated by Elephant Tracks II could
-and have been used to profile and improve garbage collector performance, detect memory leaks, and instruct programmers about their memory
-usage and help them evaluate their programming practices. However, although memory traces could be used for a number of feats, the traces
-are of little utility in their raw form: a few gigabytes of cryptic ASCII text. Nevertheless, the great value of memory traces have only been
-occasionally explored. This section outlines some potential directions for research and future work in the Elephant Tracks II project and in
-memory tracing, in general.
-
-\subsection{Visualization}
-The visualization of memory traces is still an open research problem at the moment, although it is difficult to deem the problem ``closed''
-any time soon since visualizations could always be improved and new visualizations could always be developed. A simple, intuitive display of
-all heap objects over time would be a poor choice, given the large number of allocated objects in a complex enough program; moreover, even if
-the number of allocated objects is small, most of the allocated objects are perhaps uninteresting to most programmers. For example, a Scala
-programmer is probably not interested in all function closures allocated during program execution.
-
-\cite{Heapviz} presents a tool, Heapviz, that is an improvement to the straightforward approach by providing some summarization facilities,
-allowing programmers to view a simplified and much more useful version of the heap graph. However, Heapviz is still not good enough: for example,
-it does not describe memory properties quantitatively, and it provides little helps for programmers to \emph{improve} their programs based on
-the traces that they have collected. To fully harvest the information hidden in memory traces and make them available to programmers, we need a
-more powerful visualization tool, which does not exist as of yet. However, a team including this author has been working on a new visualizer for
-Elephant Tracks and Elephant Tracks II, which should provide more functionality than Heapviz.
-
-\subsection{Memory traces as a programming language}
-Memory traces could be though as code for a very simple programming language of heap objects akin to C structures, with three basic operations:
-object allocation, pointer update, and object death (``deallocation''). The GC simulator in Elephant Tracks II could thus be thought of as an
-interpreter for this programming language. Although the GC trace language is not a practical or useful language for programming, this small insight
-allows us to use memory traces the way one uses a program.
-
-\subsection{Abstraction and analysis}
-There are many useful techniques to reason about and analyze the behavior of pointers and heap objects. Some more prominent ones include separation
-logic \citep{SeparationLogic}, shape analysis \citep{ShapeAnalysis}, and escape analysis. However, writing such analyses for full programs could be
-tedious. Given that a memory trace is a simplified version of a full imperative program that preserves only its heap properties, we might be able to
-run static analyses on and verify program properties with those traces instead. For example, instead of running shape analysis on a Java program, one
-might want to instead run shape analysis on its trace to detect certain classes of memory bugs. However, little work has been done in this field at the
-time of the publication of this thesis.
-
-\subsection{Extracting useful information from memory traces}
-Memory traces contain a lot of useful information, but relatively little of that has been utilized. \cite{MemInsight} used memory traces to detect the
-presence of memory leaks in JavaScript programs, but much more information could be extracted from memory traces. Some of these information can be easy
-to extract: with a little bit of effort, one could determine the ``cost centers'' of a program given a trace, or methods/functions where most memory is
-allocated; one can also obtain a time-function of heap size easily.
-
-However, more interesting and useful information can be much harder to harvest. Since Elephant Tracks II records the thread associated with each trace
-entry, one could potentially use Elephant Tracks to discover race conditions in programs. Moreover, as ET2 traces provides accurate object death
-records, those traces could be used as heuristic hints for the garbage collector. Using techniques akin to shape analysis, one could discover the
-data structures used in the program. None of these potential uses of memory traces have been explored as of yet (due to the cost-ineffectiveness of not
-having a good memory tracer), but Elephant Tracks II should enable some more productive uses of memory traces.
-
-\subsection{Combining static and dynamic analysis}
-Memory tracing is a form of dynamic analysis, but it can also be enhanced by static analyses. For example, if combined with escape analysis and liveness
-analysis, we can potentially make tracing more efficient, while also producing more accurate traces. No work, however, has been done in this
-field as of now.
-
-\subsection{Porting Elephant Tracks II to other languages}
-Finally, it is worth mentioning that Elephant Tracks II employs a modular and easily extensible architecture, and in principle any runtime system
-that uses heap allocated data structures could be used with Elephant Tracks II. However, for each runtime system, one needs to write a separate frontend
-implementation for ET2, which limits the speed at which ET2 could be ported.
-
-Currently, we only have a JVM frontend for ET2, but we have also been considering implementing other frontends. A Haskell frontend is particularly
-interesting, in part because Haskell uses lazy evaluation and is notorious for using a lot of heap memory; with Elephant Tracks II, we could better
-understand the factors responsible for Haskell's inefficient memory use (or perhaps discover, disappointingly, that there is little space for
-improvement). Combined with techniques like dynamic space limits \citep{DynamicSpaceLimits} and strictness inference \citep{Autobahn}, memory tracing could be
-used effectively towards optimization of the Glasgow Haskell Compiler's memory usage and leak problems. A Haskell frontend has been a goal of this
-project, but unfortunately we have not been able to implement it due to time constraints. Other frontends worth exploring including object-oriented
-languages like JavaScript and functional languages like OCaml, but these are currently not our priority.
-
-\section{Conclusion}
 Memory tracing is a useful and valuable dynamic analysis that can help programmers understand how they use heap memory in their programs, but it has
 also been a very costly and particularly inefficient analysis to perform, making it impractical for most purposes. In light of this problem, this thesis
 presents a tool, Elephant Tracks II, that is designed to make memory tracing useful again. To attain this goal, Elephant Tracks II uses an extensible, modular
 design, and the JVM frontend for Elephant Tracks II particularly benefits from the modular architecture to improve the performance of memory tracing. In short,
 the Elephant Tracks II project and this thesis's contributions are as following:
 \begin{itemize}
-\item providing an efficient memory tracing tool for Java;
+\item providing an efficient, extensible and practical memory tracing framework;
 \item developing an modular and effective architecture for memory tracing;
-\item enhanced the understanding of memory behavior of functional programs;
-\item demonstrated the need for careful planning and design in research software;
-\item highlighted the importance of good engineering practices in research programming.
+\item proposing new algorithms and techniques for running the Merlin algorithm offline;
+\item uncovering new insights into the Merlin algorithm;
+\item highlighting the importance of good design practices in research programming.
 \end{itemize}
 
-In the final analysis, the Elephant Tracks II project makes several important contributions not only to the field of dynamic analysis, but also to the
-practice of research programming in general. Elephant Tracks II does not only provide an important and effective tool for memory tracing, but also
-illustrates good practice and its importance in research programming. However, a little goes a long way: Elephant Tracks II makes it possible for program
+In the final analysis, the Elephant Tracks II project provides a new efficient, practical and extensible tool and architecture for memory tracing, as well as
+new algorithms for and insights into running the Merlin algorithm offline. However, a little goes a long way: Elephant Tracks II makes it possible for program
 analysis researchers and practitioners to analyze memory usage more easily, but we are still on our way to fully discover the value of memory tracing and of
 Elephant Tracks II as a tool.
