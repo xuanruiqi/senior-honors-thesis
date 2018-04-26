@@ -147,14 +147,14 @@ for all objects all at once at the end of the simulation:
     }
   }
   \Fn{\Merlin{heapGraph}}{
-    $workList \leftarrow$ empty list\; 
-    sort $workList$\ ascending\;
+    $workList \leftarrow \{\text{all heap objects}\}$\; 
+    sort $workList$\ ascending by $TS(o)$\;
     \While{$workList$ is not empty}{
       $currObj \leftarrow$ pop $WorkList$\;
       \For{each object pointed to by $currObj$}{
         $TS(pointedObj)$ = max$(TS(currObj), TS(pointedObj))$\;
         \If{$TS(currObj) > TS(pointedObj)$}{
-          push $WorkList$ $pointedObj$\;
+          push $pointedObj$ on $workList$\;
         }
       }
     }
@@ -216,14 +216,14 @@ The pseudocode representation of the algorithm is as following:
       $traverseStack \leftarrow$ empty stack\;
       mark $currObj$;
       \If{$currObj$ is not already marked}{
-        push $traverseStack$ $currObj$\;
+        push $currObj$ on $traverseStack$\;
       }
       \While{$traverseStack$ is not empty}{
         $currObj \leftarrow$ pop $traverseStack$\;
-        \For{each object pointed to by $currObj$}{
+        \For{each object pointed by $currObj$}{
           \If{object is not already marked}{
             mark object\;
-            push $traverseStack$ $object$\;
+            push $object$ on $traverseStack$\;
           }
         }
       }

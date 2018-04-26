@@ -42,7 +42,7 @@ Instead of (painstakingly) building a reference counter into a runtime system an
 records with it, one could compute the \emph{idealized death time} of objects using the Merlin algorithm, which
 is based on a simple insight. There are two ways that object ``die'', i.e. become disconnected from the reference
 graph: when there are no more references to the object, or when all objects that hold references to the said object
-have died \citep{Merlin, ElephantTracks}. Thus, we could compute the death time of each object recursively:
+have died \citep{Merlin, MerlinSIGMETRICS, ElephantTracks}. Thus, we could compute the death time of each object recursively:
 \newpage
 \begin{lstlisting}[
     caption={Haskell-style pseudocode for the Merlin algorithm},
@@ -68,12 +68,11 @@ experimental results.
 
 Another way of thinking about the Merlin algorithm is that the idealized death time for each object, in a cyclic
 graph, is that the idealized death time of each object is the least fixed-point that satisfies the equation
-
 \begin{equation*}
   T_d(o) = \mathrm{max}(T_s(o), \{T_d(p) \mid \forall p : p \rightarrow o\})
 \end{equation*}
-
-and the DFS-based implementation is simply an instance of the iterative method for the least fixed-point.
+where $T_s$ is the current timestamp function and $T_d$ is the deathtime function. The DFS-based implementation is simply
+an instance of the iterative method for the least fixed-point under this definition.
 
 Additionally, although the Merlin algorithm is designed to run on each garbage collection,
 it could also be run offline if garbage collections are recorded in the GC trace. In Elephant Tracks, the online
