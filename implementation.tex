@@ -166,7 +166,7 @@ Essentially, this algorithm performs a depth-first search on a directed cyclic g
 This algorithm is, relatively, the easiest to implement. However, using no GC would drastically increase the memory footprint of the simulator and result in
 a rather slow computation and the end of the simulation. Recall that the time complexity of depth-first search is $O(V + E)$, where $V$ is the number of
 objects and $E$ is the number of pointers. Supposing that the implementation uses 20 bytes to represent each heap object, a program with 1,000,000 objects
-and 10,000,000 pointers will create a memory footprint of around 20 megabytes (which does not yet seem a lot) and perform a very length computation. When
+and 10,000,000 pointers will create a memory footprint of around 20 megabytes (which does not yet seem a lot) and perform a very lengthy computation. When
 $V$ and $E$ increase, both time and space complexity of the algorithm would drastically increase. Thus, omitting GC would perhaps be a poor idea in practice.
 
 \subsection{Conservative root detection}
