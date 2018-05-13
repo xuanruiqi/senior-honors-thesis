@@ -6,6 +6,15 @@
 \usepackage{amsfonts}
 \usepackage{amssymb}
 \usepackage{graphicx}
+\usepackage{natbib}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\lstdefinestyle{base}{
+  basicstyle=\ttfamily\color{black},
+  moredelim=**[is][\color{red}]{@}{@},
+  moredelim=**[is][\color{blue}]{**}{**}
+}
 
 \author{Xuanrui (Ray) Qi}
 \title{Elephant Tracks II: Practical, Extensible Memory Tracing}
@@ -15,11 +24,11 @@
 \institute{Department of Computer Science,\\Tufts University} 
 \date{Senior Honors Thesis Defense\\May 3, 2018\\~\\
   \small
-  Commitee: Samuel Z. Guyer, Kathleen Fisher}
+  Committee: Samuel Z. Guyer, Kathleen Fisher}
 \begin{document}
 
 \begin{frame}
-\titlepage
+  \titlepage
 \end{frame}
 
 %\begin{frame}
@@ -34,21 +43,55 @@
   \item Make memory tracing extensible and eventually available for
     languages other than Java
   \item Develop new, language-agnostic techniques to run the Merlin algorithm
-  \item Make it easier for programmers to interact with memory traces
   \end{enumerate}
 \end{frame}
 
-\begin{frame}
-  \frametitle{What is memory tracing?}
+\begin{frame}{What is memory tracing?}
   \begin{itemize}
   \item \textbf{Complete} chronological record of what happened in the heap
-  \item Allocations, pointers updates/overwrites, etc.
-  \item Usually also contains some call-stack information
+  \item Procedure entry \& exit, allocations, pointers updates/overwrites, deaths, etc.
   \end{itemize}
 \end{frame}
 
-\begin{frame}
-  \frametitle{How to get memory traces?}
+\begin{frame}{Why do we need memory traces?}
+  \begin{itemize}
+  \item In a world where all memory is manually managed...
+    \pause
+  \item Do we know when memory is allocated? \pause
+    \textit{Yes! We allocated that.} \pause
+  \item Do we know when objects die? \pause
+    \textit{Hopefully! If not, we will forget to deallocate them and create leaks.}
+    \pause
+  \item What happens if we reference a deallocated object or an invalid pointer 
+    then? \pause \textit{We don't know exactly. But likely our program will blow up.}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Why do we need memory traces?}
+  \begin{itemize}
+  \item In a world where all memory is heap-allocated and automatically managed...
+    \pause
+  \item What happens if we reference a deallocated object or an invalid pointer
+    address? \pause \textit{Nothing, because it can't happen. Yay!}\pause
+  \item But do we know when memory is allocated? \pause
+    \textit{Sometimes...}\pause
+  \item Do we know when objects die? \pause \textit{Almost never...} \pause
+  \item Do we want to know these details, then? \pause \textit{Yes!}
+  \end{itemize}
+  
+\end{frame}
+
+\begin{frame}{What can we use memory traces for?}
+  \begin{itemize}
+  \item Evaluating GC performance
+  \item Help develop new GC algorithms
+  \item Learn new facts about object lifetime patterns \citep{Garbology}
+  \item Find memory leaks \citep{MemInsight}
+  \item Help programmers understand their memory footprint
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{How to get memory traces?}
   \begin{itemize}
   \item Through dynamic analysis/instrumentation
     \pause
@@ -58,14 +101,205 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}
-  \frametitle{The solution}
+\begin{frame}{The solution}
   \begin{itemize}
   \item Compute them!
     \pause
-  \item Compute each object's \textbf{idealized death time} using the Merlin algorithm.
+  \item Compute each object's \textbf{idealized death time} using the Merlin algorithm 
+    \citep{Merlin, MerlinSIGMETRICS}.
     \pause
   \item Idealized death time = latest time at which an object is shown possible to be reached.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Merlin}
+  \begin{equation*}
+    T_d(o) = \mathrm{max}(T_s(o), \{T_d(p) \mid \forall p : p \rightarrow o\})
+  \end{equation*}
+  $T_s(o)$: last-accessed timestamp of object\\
+  $T_d(o)$: ``idealized death time'' of object\\~\\
+  \pause
+  The death time of an object is the max of:
+  \begin{itemize}
+  \item the last time it was accessed; and
+  \item the death times of all objects pointing to it
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Merlin: the algorithm}
+  \begin{itemize}
+  \item Use an iterative method to compute death times
+  \item ``Propagate'' timestamps by depth-first search
+  \item Example on the board
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{How do we trace program execution exactly?}
+  \begin{itemize}
+  \item \textbf{Instrument} the program
+    \pause
+  \item Insert code on-the-fly to generate runtime traces
+    \pause
+  \item Important: whenever an object is used, emit a ``witness'' record
+    \pause
+  \item Analyze traces to generate death records
+   
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Can't we already do this?}
+  \begin{itemize}
+  \item Yes, you're right. There's Elephant Tracks \citep{ElephantTracks}.
+    \pause
+  \item But it's slow, heavyweight, and not very portable...
+    \pause
+  \item And it only works for Java
+    \pause
+  \item That's why we need a new tool...
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Elephant Tracks II architecture}
+  \begin{itemize}
+  \item Frontend: trace program, generate execution records, timestamp events, etc.
+    \pause
+  \item Backend: do trace analysis, compute death records
+    \pause
+  \item Pluggable architecture: one backend, multiple frontends
+  \item Separates complex computations from slow tracing
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Frontend implementation}
+  \begin{itemize}
+  \item Currently, only Java frontend implemented
+  \item Uses \textbf{JVMTI} to instrument program bytecode \emph{at runtime}
+  \item Uses \textbf{JNIF} \citep{JNIF} to manipulate bytecode
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Event detection in ET2/Java}
+  \begin{itemize}
+  \item Event detection: finding events that need to be traced
+    \pause
+  \item ET2/Java trace generation is \emph{not completely dynamic}
+    \pause
+  \item Bytecode search for certain key instructions
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Instrumenting Java programs}
+  \begin{lstlisting}[language=jvmis, style=base]
+    52: aload_1
+    @53: invokevirtual #9@
+    56: goto          89
+    59: aload_0
+    @60: getfield      #3@
+    63: ifnonnull     81
+    66: aload_0
+  \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Instrumenting Java programs}
+  \begin{lstlisting}[language=jvmis, style=base]
+    52: aload_1
+    @53: invokevirtual #9@
+    **##: invokestatic (method entry)**
+    56: goto          89
+    59: aload_0
+    @60: getfield      #3@
+    **##: invokestatic (witness)**
+    63: ifnonnull     81
+    66: aload_0
+  \end{lstlisting}
+\end{frame}
+
+\begin{frame}{Main optimizations}
+  \begin{itemize}
+  \item \textbf{``Native'' bytecode manipulation}\\
+    \textit{ET}: bytecode goes into a separate Java process, gets rewritten, and 
+    then sent back (very slow)\\
+    \textit{ET2}: bytecode gets rewritten directly in the JVMTI agent (much better)
+    
+    \pause
+    
+  \item \textbf{Java-based instrumentation}\\
+    \textit{ET}: each instrumentation call is an FFI call to a C++ function (expensive)\\
+    \textit{ET2}: everything happens in Java (leverages JIT)
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{The backend}
+  \begin{itemize}
+  \item Also called the \textbf{GC simulator}
+  \item Workflow: ``execute'' the trace, run GC simulation as appropriate, compute death times after each GC
+    \pause
+  \item Few assumptions about the memory model!
+    \pause
+  \item Only assumptions: must have heap-allocated blocks, pointers, and GC
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Simulating GC}
+  \begin{itemize}
+  \item Problem: no exact knowledge of GC roots inside the traces, so can't run GC
+    \pause
+  \item Solution: use a approximate, conservative strategy!
+    \pause
+  \item Treat everything possibly alive in the current context as GC roots
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{``Conservative root searching''}
+  \begin{itemize}
+  \item Keep a stack that simulates the call stack
+    \pause
+  \item Generate records for each parameter to procedure on entry
+    \pause
+  \item ``Parameter'' records and ``witness'' records pushed to the stack
+    \pause
+  \item When GC triggered, use everything on the stack as root
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Extending ET2}
+  \begin{itemize}
+  \item ET2 is \textbf{extensible} by design
+    \pause
+  \item One backend, multiple languages, multiple frontends
+    \pause
+  \item Same simple execution model
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Why extend ET2?}
+  \begin{itemize}
+  \item Support different languages
+    \pause
+  \item Study memory use in functional programming languages
+    \begin{itemize}
+    \item First-class functional closures
+    \item Lazy FPLs \& thunks
+    \end{itemize}
+    \pause 
+  \item Compare memory usage in different languages
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Current state of ET2}
+  \begin{itemize}
+  \item ET2/Java is mostly usable
+  \item Some edge cases unimplemented (e.g. reflection)
+  \item Around 10-100 times faster than Elephant Tracks
+  \item ET2 backend is still work in progress (outside collaboration)
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{In the thesis...}
+  \begin{itemize}
+  \item Details on the architecture \& trace format
+  \item Details on the algorithms described here
+  \item More about implementation specifics
   \end{itemize}
 \end{frame}
 
@@ -73,7 +307,8 @@
   \frametitle{Thanks to my collaborators}
   \includegraphics[scale=0.1]{google.jpg}
   \hspace*{\fill}
-  \includegraphics[scale=0.1]{anu.jpeg}
+  \includegraphics[scale=0.1]{anu.jpeg}\\
+  
   \textbf{Google}: JC Beyler, Man Cao, Wessam Hassanein, Kathryn McKinley, Ryan Rose,
   Leandro Watanabe
   
@@ -84,13 +319,16 @@
 
 \begin{frame}
   \frametitle{and finally...}
-  Thanks to my committee:
-  \begin{itemize}
-  \item Professor Sam Guyer (chair)
-  \item Professor Kathleen Fisher
-  \end{itemize}
-
+  Thanks to my committee...
+  \pause
+  \newline
   and thanks to everyone who came today!
+\end{frame}
+
+\begin{frame}[allowframebreaks]{References}
+  \def\newblock{}
+  \bibliographystyle{acmref}
+  \bibliography{slide}
 \end{frame}
 
 \end{document}

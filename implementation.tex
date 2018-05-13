@@ -239,3 +239,25 @@ Implementing the backend is relatively straightforward, although not completed b
 simulator (which is written in the C++ programming language) and add GC simulation/death time computation procedures to it. Specifically, we implement
 algorithm modularity, in which each GC simulation/death time computation algorithm is implemented as one implementation of a module (i.e. class), so that
 adding new GC simulation algorithms is easy and straightforward.
+
+
+\section{Some experimental results}
+Currently, ET2 has not been fully implemented, nevertheless it could be used to generate some incomplete traces. We present some experimental profiling
+results comparing the runtime efficiency of Elephant Tracks and ET2/Java. All experiments are run on a Linux server with a six-core, 12-thread, 2.80 GHz Intel
+Xeon X5660 processor and 12 gigabytes of main memory. The server runs Arch Linux with kernel version 4.13.12-1.
+
+All timing experiments are performed using the \lstinline{time} tool built in to GNU Bash. We give both the \lstinline{real} and \lstinline{user} timing for
+each of the experiments:
+
+\begin{table}[h!]
+  \centering
+  \begin{tabular}{| c | c | c | c |}
+    \hline
+    Benchmark & Raw & ET& ET2/Java\\
+    \hline \hline
+    LambdaCalc & 0.089  & 0.620 & 5.123\\
+    \hline
+    
+  \end{tabular}
+  \caption{\lstinline{real} timing for each benchmark}
+\end{table}
